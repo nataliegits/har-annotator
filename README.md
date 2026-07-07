@@ -94,19 +94,70 @@ All fetched, versioned, and hashed in `data/manifest.csv` (URL + access date +
 SHA-256 + size). See `phase0_sources.md` for the full provenance / de-risking
 notes.
 
-| Source | Used for | Access |
-|--------|----------|--------|
-| **HARs** — Cui et al. 2025, *Nature* (doi:10.1038/s41586-025-08622), Supp. Table 4 | 3,257 HARs, hg38-native; neuronal Hi-C HAR→gene links | GitHub mirror `athenamarou/HAR-TFBS-Project` |
-| **Constraint** — Zoonomia 241-way phyloP bigWig (UCSC `cactus241way`) | per-HAR mean/max phyloP | **queried remotely** (9.6 GB; not downloaded) |
-| **Neurodev genes** — DDG2P (Gene2Phenotype Developmental Disorders) | 2,524 genes mapped to hg38 coords, with confidence tier | EBI FTP |
-| **GWAS** — EBI GWAS Catalog (ontology-annotated) | 22,489 genome-wide-sig neuropsychiatric lead SNPs | EBI FTP |
-| **Developing brain** — ENCODE embryonic-brain DNase-seq (`ENCFF660HML`, male embryo 105 days, expt ENCSR420RWU) | 165,568 peaks; regulatory-activity axis | ENCODE portal |
-| **Gene coords** — UCSC refGene hg38 | gene symbol → strand-aware TSS | UCSC |
+| Source | Used for | manifest row | builder / consumer |
+|--------|----------|:-:|:-:|
+| **HARs** — Cui et al. 2025 | 3,257 HARs, hg38-native; neuronal Hi-C HAR→gene links | `hars_bed`, `hars_meta`, `cui2025_supp4` | `data_io.py`, `references.build_hic_links` |
+| **Constraint** — Zoonomia 241-way phyloP | per-HAR mean/max phyloP | *(remote query, not cached)* | `filters.annotate_phylop` |
+| **Neurodev genes** — DDG2P (Gene2Phenotype) | 2,524 genes → hg38 coords + confidence tier | `ddg2p`, `refgene_hg38` | `references.build_neurodev` |
+| **GWAS** — EBI GWAS Catalog (ontology-annotated) | 22,489 genome-wide-sig neuropsychiatric lead SNPs | `gwas_assoc` | `references.build_gwas_loci` |
+| **Developing brain** — ENCODE embryonic-brain DNase-seq | 165,568 peaks; regulatory-activity axis | `fetal_brain_dnase` | `evidence.annotate_brain_dnase` |
+| **Gene coords** — UCSC refGene hg38 | gene symbol → strand-aware TSS | `refgene_hg38` | `references.build_genes` |
+| **TF motifs** | *(reserved — not wired in; `motif` score = 0)* | — | — |
 
-**Substitution note.** SFARI Gene was unreachable from the build environment
-(`gene-archive.sfari.org` blocked), so the neurodevelopmental gene set is
-**DDG2P only**. The pipeline still unions any SFARI symbols supplied via
-`--sfari`, so a SFARI export can be dropped in without code changes.
+Every raw file's exact download URL, SHA-256, access date, and size is in
+`data/manifest.csv`; `phase0_sources.md` has the full de-risking notes. The
+raw files themselves are **not committed** (see `.gitignore`) — `download.py`
+re-fetches and hash-verifies them from the URLs below.
+
+### Primary references & direct links
+
+- **HARs — Cui et al. (2025), *Nature*.** doi:[10.1038/s41586-025-08622](https://doi.org/10.1038/s41586-025-08622).
+  Supplies the 3,257 HAR coordinates and the neuronal Hi-C HAR→gene map
+  (Supp. Table 4). Fetched via the GitHub mirror
+  [`athenamarou/HAR-TFBS-Project`](https://github.com/athenamarou/HAR-TFBS-Project)
+  (`data/hars_hg38.bed`, `data/hars_hg38.tsv`,
+  `data/supplementary/41586_2025_8622_MOESM4_ESM.xlsx`).
+- **Neurodevelopmental gene list — DDG2P, from Gene2Phenotype (G2P).**
+  Download: `https://ftp.ebi.ac.uk/pub/databases/gene2phenotype/G2P_data_downloads/2026_06_28/DDG2P_2026-06-28.csv.gz` (EBI).
+  Portal: [www.ebi.ac.uk/gene2phenotype](https://www.ebi.ac.uk/gene2phenotype).
+  Primary paper: Thormann *et al.* (2024), *Genome Medicine* — "Curating genomic
+  disease-gene relationships with Gene2Phenotype (G2P)",
+  doi:[10.1186/s13073-024-01398-1](https://doi.org/10.1186/s13073-024-01398-1)
+  ([PMC11539801](https://pmc.ncbi.nlm.nih.gov/articles/PMC11539801/)); earlier
+  G2P/VEP tool paper: Thormann *et al.* (2019), *Nature Communications*,
+  doi:[10.1038/s41467-019-10016-3](https://doi.org/10.1038/s41467-019-10016-3).
+- **Developing-brain open chromatin — ENCODE DNase-seq `ENCFF660HML`.**
+  Peak file: [encodeproject.org/files/ENCFF660HML](https://www.encodeproject.org/files/ENCFF660HML/)
+  (download: `@@download/ENCFF660HML.bed.gz`); parent experiment
+  [ENCSR420RWU](https://www.encodeproject.org/experiments/ENCSR420RWU/)
+  (brain, male embryo 105 days). Portal paper: Davis *et al.* (2018),
+  *Nucleic Acids Research* — "The Encyclopedia of DNA Elements (ENCODE): data
+  portal update", doi:[10.1093/nar/gkx1081](https://doi.org/10.1093/nar/gkx1081);
+  consortium: The ENCODE Project Consortium (2012), *Nature*,
+  doi:[10.1038/nature11247](https://doi.org/10.1038/nature11247).
+- **GWAS — EBI GWAS Catalog** (ontology-annotated associations, latest release).
+  Download: `https://ftp.ebi.ac.uk/pub/databases/gwas/releases/latest/gwas-catalog-associations_ontology-annotated-full.zip`.
+  Paper: Sollis *et al.* (2023), *Nucleic Acids Research*,
+  doi:[10.1093/nar/gkac1010](https://doi.org/10.1093/nar/gkac1010).
+- **Constraint — Zoonomia 241-way phyloP** (Cactus 241-way alignment), queried
+  remotely from the UCSC bigWig (`hg38 cactus241way`); 9.6 GB, never downloaded.
+  Paper: Sullivan *et al.* / Zoonomia Consortium (2023), *Science*,
+  doi:[10.1126/science.abn2937](https://doi.org/10.1126/science.abn2937).
+- **Gene coordinates — UCSC refGene (hg38).**
+  `https://hgdownload.soe.ucsc.edu/goldenPath/hg38/database/refGene.txt.gz`.
+
+**SFARI substitution note.** SFARI Gene was unreachable from the build
+environment (`gene-archive.sfari.org` blocked), so the neurodevelopmental gene
+set is **DDG2P only** — the shipped 363 candidates reflect that. The pipeline
+unions any SFARI symbols supplied via `--sfari`, so a SFARI export can be
+dropped in without code changes (this will change the candidate count and
+ranking).
+
+**TF-motif note.** The `motif` score component (weight 0.05) is **reserved and
+contributes 0** — no motif database is downloaded or wired in. Scoring whether
+each HAR's human-specific substitutions create/disrupt a TF binding site
+(e.g. against JASPAR / HOCOMOCO PWMs) is flagged as future work, alongside the
+true human/chimp substitution count.
 
 ---
 
