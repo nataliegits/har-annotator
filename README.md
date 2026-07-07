@@ -96,7 +96,7 @@ notes.
 
 | Source | Used for | manifest row | builder / consumer |
 |--------|----------|:-:|:-:|
-| **HARs** — Cui et al. 2025 | 3,257 HARs, hg38-native; neuronal Hi-C HAR→gene links | `hars_bed`, `hars_meta`, `cui2025_supp4` | `data_io.py`, `references.build_hic_links` |
+| **HARs & Hi-C** — Cui et al. 2025, *Nature* | 3,257 HARs, hg38-native; neuronal Hi-C HAR→gene links | `hars_bed`, `hars_meta`, `cui2025_supp4` | `data_io.py`, `references.build_hic_links` |
 | **Constraint** — Zoonomia 241-way phyloP | per-HAR mean/max phyloP | *(remote query, not cached)* | `filters.annotate_phylop` |
 | **Neurodev genes** — DDG2P (Gene2Phenotype) | 2,524 genes → hg38 coords + confidence tier | `ddg2p`, `refgene_hg38` | `references.build_neurodev` |
 | **GWAS** — EBI GWAS Catalog (ontology-annotated) | 22,489 genome-wide-sig neuropsychiatric lead SNPs | `gwas_assoc` | `references.build_gwas_loci` |
@@ -111,10 +111,13 @@ re-fetches and hash-verifies them from the URLs below.
 
 ### Primary references & direct links
 
-- **HARs — Cui et al. (2025), *Nature*.** doi:[10.1038/s41586-025-08622](https://doi.org/10.1038/s41586-025-08622).
-  Supplies the 3,257 HAR coordinates and the neuronal Hi-C HAR→gene map
-  (Supp. Table 4). Fetched via the GitHub mirror
-  [`athenamarou/HAR-TFBS-Project`](https://github.com/athenamarou/HAR-TFBS-Project)
+- **HARs & Hi-C map — Cui et al. (2025), *Nature* 640:991–999.**
+  "Comparative characterization of human accelerated regions in neurons,"
+  doi:[10.1038/s41586-025-08622-x](https://doi.org/10.1038/s41586-025-08622-x).
+  Supplies both the 3,257 HAR coordinates **and** the neuronal Hi-C HAR→gene
+  map — they are the same paper's Supp. Table 4 (sheets "HARs information" and
+  "HARs interacting genes"), not separate downloads. Fetched via the GitHub
+  mirror [`athenamarou/HAR-TFBS-Project`](https://github.com/athenamarou/HAR-TFBS-Project)
   (`data/hars_hg38.bed`, `data/hars_hg38.tsv`,
   `data/supplementary/41586_2025_8622_MOESM4_ESM.xlsx`).
 - **Neurodevelopmental gene list — DDG2P, from Gene2Phenotype (G2P).**
@@ -135,13 +138,34 @@ re-fetches and hash-verifies them from the URLs below.
   portal update", doi:[10.1093/nar/gkx1081](https://doi.org/10.1093/nar/gkx1081);
   consortium: The ENCODE Project Consortium (2012), *Nature*,
   doi:[10.1038/nature11247](https://doi.org/10.1038/nature11247).
-- **GWAS — EBI GWAS Catalog** (ontology-annotated associations, latest release).
-  Download: `https://ftp.ebi.ac.uk/pub/databases/gwas/releases/latest/gwas-catalog-associations_ontology-annotated-full.zip`.
-  Paper: Sollis *et al.* (2023), *Nucleic Acids Research*,
+- **Neuropsychiatric GWAS — NHGRI-EBI GWAS Catalog** (ontology-annotated
+  associations, latest release).
+  Download: `https://ftp.ebi.ac.uk/pub/databases/gwas/releases/latest/gwas-catalog-associations_ontology-annotated-full.zip`;
+  portal [www.ebi.ac.uk/gwas](https://www.ebi.ac.uk/gwas).
+  Papers: Cerezo *et al.* (2025), *Nucleic Acids Research* 53(D1):D998–D1005,
+  doi:[10.1093/nar/gkae1070](https://doi.org/10.1093/nar/gkae1070) (current
+  release); Sollis *et al.* (2023), *NAR* 51(D1):D977–D985,
   doi:[10.1093/nar/gkac1010](https://doi.org/10.1093/nar/gkac1010).
-- **Constraint — Zoonomia 241-way phyloP** (Cactus 241-way alignment), queried
-  remotely from the UCSC bigWig (`hg38 cactus241way`); 9.6 GB, never downloaded.
-  Paper: Sullivan *et al.* / Zoonomia Consortium (2023), *Science*,
+  **"Neuropsychiatric" is a keyword filter, not a Catalog category.**
+  `references.build_gwas_loci` selects rows whose `MAPPED_TRAIT`/`DISEASE/TRAIT`
+  match `references._NEURO_PAT` (schizophren·autis·bipolar·depress·neurotic·
+  cognit·educational·intellig·attention-deficit/adhd·alzheimer·neurodevelop·
+  intellectual-disab·epileps·tourette·obsessive) and keeps genome-wide-
+  significant hits (p < 5×10⁻⁸) → 22,489 lead SNPs. The term list is a module
+  constant and is meant to be edited. **Trait-mix caveat:** the largest
+  contributors are *educational attainment*, *intelligence*, and *cognitive-
+  function* GWAS — behavioural/cognitive proxies with known social-environmental
+  confounding. "Overlaps an educational-attainment locus" is therefore a weaker
+  biological claim than "overlaps a schizophrenia locus"; the shipped
+  `mapped_trait` column lets you see which applies to each candidate.
+- **Constraint — Zoonomia 241-way phyloP** (Cactus 241-mammal alignment),
+  queried remotely from the UCSC bigWig (`hg38 cactus241way`); 9.6 GB, never
+  downloaded. The phyloP scores themselves: Christmas *et al.* (2023),
+  *Science* 380:eabn3943, "Evolutionary constraint and innovation across
+  hundreds of placental mammals,"
+  doi:[10.1126/science.abn3943](https://doi.org/10.1126/science.abn3943).
+  Disease-mapping utility of base-pair mammalian constraint: Sullivan *et al.*
+  (2023), *Science* 380:eabn2937,
   doi:[10.1126/science.abn2937](https://doi.org/10.1126/science.abn2937).
 - **Gene coordinates — UCSC refGene (hg38).**
   `https://hgdownload.soe.ucsc.edu/goldenPath/hg38/database/refGene.txt.gz`.
@@ -180,6 +204,43 @@ Outputs: `funnel_counts.csv`, `candidate_hars.parquet`, `har_evidence.parquet`
 `har_shortlist_top50.csv`. Interpretation: `top_candidates_interpretation.md`.
 Figures: `fig_funnel.png`, `fig_score_overview.png`,
 `fig_top_candidate_detail.png`.
+
+---
+
+## What "mammalian constraint" means here
+
+**phyloP** (phylogenetic P-value) is a per-base evolutionary-rate score. For
+each position in the human genome, it compares the substitution rate observed
+across an alignment of 241 placental mammals against the rate expected under
+neutral drift. Positive = **slower than neutral** = the base has been conserved
+= *constrained* (purifying selection removed mutations there). Negative = faster
+than neutral (accelerated); ~0 = evolving neutrally. The scores come from the
+Zoonomia Cactus 241-mammal alignment (Christmas et al. 2023). We take the
+**mean phyloP over each HAR's span** as its constraint value and keep HARs with
+mean > 1.0 (Step A: 3,257 → 2,757).
+
+Why constraint matters for a *human-accelerated* region — the apparent paradox
+is the point. A HAR is a locus that was **deeply conserved across mammals**
+(high ancestral constraint) yet **changed rapidly on the human branch**. The
+mammalian-constraint filter enriches for elements that were doing something
+selectively important for a long time; the human-specific change is then more
+likely to be functionally consequential than a change in a locus that was
+never constrained. Constraint (mammalian, phyloP) and acceleration
+(human-branch) are **different axes** — this pipeline scores constraint
+directly and, as noted in the caveats, only *proxies* acceleration.
+
+**"Sharpened disease mapping" — what's actually established vs. what we
+verified here.** The strong, external result is that base-pair mammalian
+constraint from Zoonomia enriches for trait/disease heritability and improves
+prioritization of causal variants — shown genome-wide in Sullivan et al. (2023,
+*Science*, doi:10.1126/science.abn2937), not something this pipeline proves. To
+avoid overclaiming, the enrichment was checked **inside this dataset**: of all
+3,257 HARs, constrained ones (phyloP > 1) overlap a neuropsychiatric GWAS locus
+(±25 kb) at **21.0%** vs **15.4%** for unconstrained — a **1.37× enrichment**
+(Fisher odds 1.46, p = 3.6×10⁻³). So constraint does concentrate disease
+overlap in our HAR set, but **modestly**; it is a sensible prioritization axis,
+not a strong causal sieve on its own. The pipeline's power comes from
+*combining* it with gene, disease, and brain-activity evidence.
 
 ---
 
