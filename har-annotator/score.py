@@ -12,12 +12,12 @@ Components
 constraint     : mammalian constraint strength (phyloP mean), min-max scaled
 acceleration   : substitution-burden proxy (HAR width), log-scaled  [see phase0 caveat]
 gene           : neurodev-gene link quality — DDG2P confidence tier, boosted if
-                 the gene is assigned by Hi-C rather than nearest-TSS, and
+                 the gene is assigned by PLAC-seq rather than nearest-TSS, and
                  decaying with HAR–TSS distance
 disease        : neuropsychiatric GWAS overlap — significance (−log10 p) and
                  proximity to the lead SNP
 brain          : active in the developing brain — ENCODE embryonic-cortex DNase
-                 peak overlap (+ Hi-C ATAC support)
+                 peak overlap (+ PLAC-seq ATAC support)
 motif          : reserved (0 unless a motif-disruption annotation is supplied)
 """
 from __future__ import annotations
@@ -65,11 +65,11 @@ def compute_scores(ev: pd.DataFrame, weights: dict | None = None,
     # acceleration proxy: log HAR width, min-max scaled
     df["score_acceleration"] = _minmax(np.log1p(df["width"]))
 
-    # gene: confidence tier * distance-decay, +0.15 boost for Hi-C assignment
+    # gene: confidence tier * distance-decay, +0.15 boost for PLAC-seq assignment
     conf = df["gene_confidence"].str.lower().map(_CONF_SCORE).fillna(0.3)
     dist_decay = 1.0 - (df["gene_distance"].clip(0, gene_window) / gene_window)
-    hic_boost = np.where(df["gene_assignment_method"].eq("hic_linked"), 0.15, 0.0)
-    df["score_gene"] = np.clip(conf * dist_decay + hic_boost, 0, 1)
+    plac_boost = np.where(df["gene_assignment_method"].eq("plac_linked"), 0.15, 0.0)
+    df["score_gene"] = np.clip(conf * dist_decay + plac_boost, 0, 1)
 
     # disease: significance (−log10 p, capped at 50) * proximity decay
     neglogp = -np.log10(pd.to_numeric(df["gwas_pval"], errors="coerce").clip(lower=1e-300))
@@ -77,9 +77,9 @@ def compute_scores(ev: pd.DataFrame, weights: dict | None = None,
     prox = 1.0 - (df["gwas_distance"].clip(0, gwas_window) / gwas_window)
     df["score_disease"] = np.clip(sig.fillna(0) * prox.fillna(0), 0, 1)
 
-    # brain: DNase peak overlap (0.8) + Hi-C ATAC support (0.2)
+    # brain: DNase peak overlap (0.8) + PLAC-seq ATAC support (0.2)
     df["score_brain"] = (df["brain_dnase_overlap"].astype(float) * 0.8
-                         + df["hic_atac"].fillna(False).astype(float) * 0.2)
+                         + df["plac_atac"].fillna(False).astype(float) * 0.2)
 
     # motif: reserved
     if "score_motif" not in df:

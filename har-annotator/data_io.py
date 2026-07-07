@@ -31,8 +31,8 @@ def load_hars() -> pd.DataFrame:
     return hars.reset_index(drop=True)
 
 
-def load_hic_interaction_table() -> pd.DataFrame:
-    """Cui 2025 neuronal Hi-C 'HARs interacting genes' sheet (raw)."""
+def load_plac_interaction_table() -> pd.DataFrame:
+    """Cui 2025 neuronal PLAC-seq 'HARs interacting genes' sheet (raw)."""
     ig = pd.read_excel(_supp4(), sheet_name="HARs interacting genes", header=2)
     ig.columns = [str(c).strip() for c in ig.columns]
     return ig

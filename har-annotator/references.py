@@ -10,7 +10,7 @@ tidy parquet. All are idempotent: if the parquet already exists and
                     the highest DDG2P confidence tier per gene
     gwas_loci       EBI GWAS Catalog -> genome-wide-significant (p<5e-8)
                     neuropsychiatric/cognitive lead SNPs
-    hic_links       Cui 2025 neuronal Hi-C -> HAR -> gene interaction links
+    plac_links      Cui 2025 neuronal PLAC-seq -> HAR -> gene interaction links
 
 Data-source substitution note: SFARI Gene was unreachable from the build
 environment, so the neurodevelopmental gene set is DDG2P only. ``build_neurodev``
@@ -120,10 +120,10 @@ def _har_ids(cell) -> list[str]:
     return re.findall(r"HAR_\d+", str(cell))
 
 
-def build_hic_links(interaction_gene_table: pd.DataFrame,
+def build_plac_links(interaction_gene_table: pd.DataFrame,
                     force: bool = False) -> pd.DataFrame:
-    """Cui 2025 neuronal Hi-C interaction-gene table -> HAR->gene links."""
-    out = dl.DATA_DIR / "har_hic_gene_links.parquet"
+    """Cui 2025 neuronal PLAC-seq interaction-gene table -> HAR->gene links."""
+    out = dl.DATA_DIR / "har_plac_gene_links.parquet"
     if out.exists() and not force:
         return pd.read_parquet(out)
     links = []
@@ -137,6 +137,6 @@ def build_hic_links(interaction_gene_table: pd.DataFrame,
             links.append((h, gene, "distal", h in distal_atac))
         for h in _har_ids(r.get("The nearest distal HAR")):
             links.append((h, gene, "nearest_distal", h in distal_atac))
-    hic = pd.DataFrame(links, columns=["har_id", "hic_gene", "hic_type", "hic_atac"]).drop_duplicates()
-    hic.to_parquet(out)
-    return hic
+    plac = pd.DataFrame(links, columns=["har_id", "plac_gene", "plac_type", "plac_atac"]).drop_duplicates()
+    plac.to_parquet(out)
+    return plac
