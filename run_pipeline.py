@@ -12,7 +12,7 @@ cache unless ``--force-download`` is given.
     python run_pipeline.py --weights gene=0.35,disease=0.30
 
 Stages
-    0  download + build reference tables (genes, neurodev, GWAS loci, Hi-C)
+    0  download + build reference tables (genes, neurodev, GWAS loci, PLAC-seq)
     1  funnel: constraint -> neurodev-gene proximity -> GWAS overlap
     2  per-element evidence spine
     3  transparent additive score + ranking
@@ -79,10 +79,10 @@ def main(argv=None):
     gwas_loci = references.build_gwas_loci(args.gwas_zip, pval_max=args.gwas_pval,
                                            force=args.force_download)
     hars = data_io.load_hars()
-    hic = references.build_hic_links(data_io.load_hic_interaction_table(),
+    plac = references.build_plac_links(data_io.load_plac_interaction_table(),
                                      force=args.force_download)
     print(f"    neurodev genes={len(neuro)}  gwas loci={len(gwas_loci)}  "
-          f"HARs={len(hars)}  hic links={len(hic)}")
+          f"HARs={len(hars)}  plac links={len(plac)}")
 
     # ---- Stage 1: funnel ----------------------------------------------------
     print("[1] funnel: constraint -> gene proximity -> GWAS ...")
@@ -108,9 +108,9 @@ def main(argv=None):
 
     # ---- Stage 2: evidence spine -------------------------------------------
     print("[2] assembling evidence spine ...")
-    ev = evidence.assemble(cand, hic, neuro, dl.DATA_DIR / args.peaks)
+    ev = evidence.assemble(cand, plac, neuro, dl.DATA_DIR / args.peaks)
     ev.to_parquet(out / "har_evidence.parquet")
-    print(f"    evidence table {ev.shape}  hic-linked={ev.gene_assignment_method.eq('hic_linked').sum()}"
+    print(f"    evidence table {ev.shape}  plac-linked={ev.gene_assignment_method.eq('plac_linked').sum()}"
           f"  brain-active={ev.brain_dnase_overlap.sum()}")
 
     # ---- Stage 3: transparent score ----------------------------------------

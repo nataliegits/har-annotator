@@ -11,7 +11,7 @@ UTC access date, SHA256, and byte size.
 
 | # | Source | File | Rows | Notes |
 |---|--------|------|------|-------|
-| 1 | **HARs** — Cui et al. 2025, *Nature* (doi:10.1038/s41586-025-08622); coordinates redistributed in the `athenamarou/HAR-TFBS-Project` repo | `hars_hg38.bed` + `cui2025_HAR_supp4.xlsx` | 3,257 HARs | hg38 native. Union HAR set used in current neurodevelopmental HAR work; cross-referenced to HARsv2 / ZOOHAR IDs. |
+| 1 | **HARs** — Cui et al. 2025, *Nature* (doi:10.1038/s41586-025-08622-x); coordinates redistributed in the `athenamarou/HAR-TFBS-Project` repo | `hars_hg38.bed` + `cui2025_HAR_supp4.xlsx` | 3,257 HARs | hg38 native. Union HAR set used in current neurodevelopmental HAR work; cross-referenced to HARsv2 / ZOOHAR IDs. |
 | 2 | **Mammalian constraint** — Zoonomia 241-way phyloP | `cactus241way.phyloP.bw` (queried **remotely**, not downloaded) | per-base | UCSC `hg38/cactus241way`. bigWig is 9.6 GB; per-element remote query benchmarked at **~2 min for all 3,257 HARs** — the Phase-0 risk is cleared, so we use per-element phyloP mean/max directly (no fallback needed). |
 | 3 | **Neurodevelopmental genes** — Gene2Phenotype Developmental Disorders (DDG2P) | `DDG2P_2026-06-28.csv.gz` | 2,860 gene–disease records | Gene symbol, confidence category, disease, allelic requirement, MONDO. |
 | 4 | **Disease loci** — EBI GWAS Catalog, ontology-annotated associations | `gwas-catalog-associations_ontology-annotated-full.zip` | 1,150,105 associations | hg38 (`CHR_ID`/`CHR_POS`). ~33,400 rows match neuropsychiatric/neurodevelopmental traits (schizophrenia, autism, bipolar, ADHD, educational attainment, cognition, depression, epilepsy, intellectual disability). |
@@ -19,9 +19,9 @@ UTC access date, SHA256, and byte size.
 
 ## Stretch sources — obtained
 
-- **Enhancer→gene links (Hi-C in neurons):** the Cui 2025 supplement (sheet
+- **Enhancer→gene links (PLAC-seq in neurons):** the Cui 2025 supplement (sheet
   *"HARs interacting genes"*, 1,720 rows) provides HAR→interacting-gene links from
-  neuronal Hi-C plus neuronal ATAC peak locations. This upgrades gene assignment
+  neuronal PLAC-seq plus neuronal ATAC peak locations. This upgrades gene assignment
   beyond nearest-TSS for HARs that appear in the map.
 - **Neuronal ATAC peaks:** embedded in the same supplement (promoter + distal
   interacting ATAC peak coordinates).
