@@ -25,7 +25,7 @@ python run_pipeline.py            # reproduces the shipped shortlist exactly
 | C | Within 25 kb of a genome-wide-significant neuropsychiatric GWAS lead SNP | **363** |
 
 The 363 candidates are then scored on six axes and ranked. Top candidate:
-**HAR_575 → *POC1B*** (Hi-C-linked, educational-attainment GWAS overlap,
+**HAR_575 → *POC1B*** (PLAC-seq-linked, educational-attainment GWAS overlap,
 embryonic-brain DNase-active). Classic neurodevelopmental / human-evolution
 genes recovered in the shortlist include *ZEB2, TCF4, MEF2C, PHOX2B, TCF20,
 ZSWIM6, FOXP2, SOX5, NR4A2, MITF*.
@@ -45,9 +45,9 @@ total_score = Σ  WEIGHTS[c] · score_c        (c in the six components below)
 | Component | Default weight | Evidence |
 |-----------|:-:|----------|
 | `constraint`   | 0.20 | mean 241-way phyloP, min-max scaled |
-| `gene`         | 0.25 | DDG2P confidence tier × TSS-distance decay, +0.15 if Hi-C-linked |
+| `gene`         | 0.25 | DDG2P confidence tier × TSS-distance decay, +0.15 if PLAC-seq-linked |
 | `disease`      | 0.25 | −log10(GWAS p) × proximity to lead SNP |
-| `brain`        | 0.15 | ENCODE embryonic-brain DNase peak overlap (+ Hi-C ATAC support) |
+| `brain`        | 0.15 | ENCODE embryonic-brain DNase peak overlap (+ PLAC-seq ATAC support) |
 | `acceleration` | 0.10 | HAR width (log-scaled) — **proxy**, see caveats |
 | `motif`        | 0.05 | reserved (0 unless a motif-disruption annotation is supplied) |
 
@@ -96,7 +96,7 @@ notes.
 
 | Source | Used for | manifest row | builder / consumer |
 |--------|----------|:-:|:-:|
-| **HARs & Hi-C** — Cui et al. 2025, *Nature* | 3,257 HARs, hg38-native; neuronal Hi-C HAR→gene links | `hars_bed`, `hars_meta`, `cui2025_supp4` | `data_io.py`, `references.build_hic_links` |
+| **HARs & PLAC-seq** — Cui et al. 2025, *Nature* | 3,257 HARs, hg38-native; neuronal PLAC-seq HAR→gene links | `hars_bed`, `hars_meta`, `cui2025_supp4` | `data_io.py`, `references.build_plac_links` |
 | **Constraint** — Zoonomia 241-way phyloP | per-HAR mean/max phyloP | *(remote query, not cached)* | `filters.annotate_phylop` |
 | **Neurodev genes** — DDG2P (Gene2Phenotype) | 2,524 genes → hg38 coords + confidence tier | `ddg2p`, `refgene_hg38` | `references.build_neurodev` |
 | **GWAS** — EBI GWAS Catalog (ontology-annotated) | 22,489 genome-wide-sig neuropsychiatric lead SNPs | `gwas_assoc` | `references.build_gwas_loci` |
@@ -111,15 +111,30 @@ re-fetches and hash-verifies them from the URLs below.
 
 ### Primary references & direct links
 
-- **HARs & Hi-C map — Cui et al. (2025), *Nature* 640:991–999.**
+- **HARs & PLAC-seq map — Cui et al. (2025), *Nature* 640:991–999.**
   "Comparative characterization of human accelerated regions in neurons,"
   doi:[10.1038/s41586-025-08622-x](https://doi.org/10.1038/s41586-025-08622-x).
-  Supplies both the 3,257 HAR coordinates **and** the neuronal Hi-C HAR→gene
-  map — they are the same paper's Supp. Table 4 (sheets "HARs information" and
-  "HARs interacting genes"), not separate downloads. Fetched via the GitHub
-  mirror [`athenamarou/HAR-TFBS-Project`](https://github.com/athenamarou/HAR-TFBS-Project)
+  Supplies both the 3,257 HAR coordinates **and** the neuronal PLAC-seq HAR→gene
+  map — they are the same table, not separate downloads. That table is the
+  paper's **Supplementary Table 2** ("HAR and their chimpanzee ortholog
+  interacting genes in neurons"); the map used here is its "Table-b: Genes
+  interacting with HARs in human" sheet (1,303 HARs, 1,719 genes,
+  genome-wide). **Note on numbering:** the download file is named
+  `41586_2025_8622_MOESM4_ESM.xlsx` (Nature's *MOESM4* file id), but the table
+  it contains is Supplementary Table **2** — the MOESM file number and the
+  supplementary-table number do not correspond. This is *not* Supplementary
+  Table 3, which is the separate CRISPRi-prioritized shortlist of ~20 HARs
+  selected for functional validation. Fetched via the GitHub mirror
+  [`athenamarou/HAR-TFBS-Project`](https://github.com/athenamarou/HAR-TFBS-Project)
   (`data/hars_hg38.bed`, `data/hars_hg38.tsv`,
   `data/supplementary/41586_2025_8622_MOESM4_ESM.xlsx`).
+
+  **Method note:** the HAR→gene links come from **PLAC-seq** (proximity
+  ligation-assisted ChIP-seq, anchored on the H3K4me3 active-promoter mark) in
+  human and chimpanzee iPSC-derived neurons — a ChIP-anchored chromatin-contact
+  assay, *not* generic Hi-C. Earlier drafts of this project called it "Hi-C";
+  that was imprecise and has been corrected throughout, including the column
+  names (`plac_gene`, `plac_type`, `plac_atac`, assignment `plac_linked`).
 - **Neurodevelopmental gene list — DDG2P, from Gene2Phenotype (G2P).**
   Download: `https://ftp.ebi.ac.uk/pub/databases/gene2phenotype/G2P_data_downloads/2026_06_28/DDG2P_2026-06-28.csv.gz` (EBI).
   Portal: [www.ebi.ac.uk/gene2phenotype](https://www.ebi.ac.uk/gene2phenotype).
@@ -190,8 +205,8 @@ true human/chimp substitution count.
 ```
 har_annotator/
   download.py    cached + hashed + manifest-logged fetches
-  data_io.py     load HAR base table + Cui Hi-C sheet from the supplement
-  references.py  build derived tables: genes, neurodev (DDG2P), GWAS loci, Hi-C links
+  data_io.py     load HAR base table + Cui PLAC-seq sheet from the supplement
+  references.py  build derived tables: genes, neurodev (DDG2P), GWAS loci, PLAC-seq links
   filters.py     Phase-1 funnel: annotate_phylop, filter_constrained,
                  assign_nearest_gene, annotate_gwas, keep_gwas
   evidence.py    Phase-2 per-element evidence spine (assemble)
@@ -253,7 +268,7 @@ caveats apply throughout and are load-bearing:
    lead SNP — not that the HAR is the causal element or that its
    human-specific changes drive the association.
 2. **Nearest gene ≠ target gene.** `nearest_tss` assignments are a proximity
-   heuristic; `hic_linked` assignments rest on a neuronal Hi-C loop (stronger,
+   heuristic; `plac_linked` assignments rest on a neuronal PLAC-seq interaction (stronger,
    still correlative).
 3. **Acceleration is a proxy here.** The Cui table ships no per-element
    acceleration statistic we could thread through, so HAR width (log-scaled)
@@ -277,5 +292,5 @@ MIT — see `LICENSE`.
 
 ## Citation of primary HAR source
 
-Cui et al. (2025). *Nature*. doi:10.1038/s41586-025-08622. HAR set and neuronal
-Hi-C HAR→gene interaction map.
+Cui et al. (2025). *Nature* 640:991–999. doi:10.1038/s41586-025-08622-x. HAR set and neuronal
+PLAC-seq HAR→gene interaction map.
