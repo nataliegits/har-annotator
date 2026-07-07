@@ -1,0 +1,7 @@
+name,filename,url,access_date_utc,sha256,size_bytes
+hars_bed,hars_hg38.bed,https://raw.githubusercontent.com/athenamarou/HAR-TFBS-Project/main/data/hars_hg38.bed,2026-07-07T14:49:32+00:00,202c0226581e98fda82731bdcd7a2fb993e413de0dfea5de112d331fdd78d38d,105973
+hars_meta,hars_hg38.tsv,https://raw.githubusercontent.com/athenamarou/HAR-TFBS-Project/main/data/hars_hg38.tsv,2026-07-07T14:49:32+00:00,1d2babbdc4b83b22c1d0b120f2fc534a9d4040433dc74d4046ab9dae1e064b75,109229
+cui2025_supp4,cui2025_HAR_supp4.xlsx,https://raw.githubusercontent.com/athenamarou/HAR-TFBS-Project/main/data/supplementary/41586_2025_8622_MOESM4_ESM.xlsx,2026-07-07T14:49:33+00:00,a5eb3486315d955bce9cb7796c43453207a930b30a6b14b5ff87c91afe8a6dff,7446850
+ddg2p,DDG2P_2026-06-28.csv.gz,https://ftp.ebi.ac.uk/pub/databases/gene2phenotype/G2P_data_downloads/2026_06_28/DDG2P_2026-06-28.csv.gz,2026-07-07T14:49:34+00:00,cbe7b7c41282876ed3d7eb57b1908afb88ce2fbf243e8c809aaf418e6c0af6f8,631686
+gwas_assoc,gwas-catalog-associations_ontology-annotated-full.zip,https://ftp.ebi.ac.uk/pub/databases/gwas/releases/latest/gwas-catalog-associations_ontology-annotated-full.zip,2026-07-07T14:50:44+00:00,bed50aca0c33232d306c597490912e925db792d72b5297f5770873a10ecc91d0,70520866
+fetal_brain_dnase,ENCFF660HML_brain_embryo105d_DNase_peaks_hg38.bed.gz,https://www.encodeproject.org/files/ENCFF660HML/@@download/ENCFF660HML.bed.gz,2026-07-07T14:58:45+00:00,c9793ca809d64070290f507e7f37fd8a4d23860583c99e47a40e8f35622aa4e2,3284881

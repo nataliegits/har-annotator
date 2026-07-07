@@ -1,0 +1,11 @@
+"""har_annotator — a reproducible pipeline that filters human accelerated
+regions (HARs) to constrained, neurodevelopment-adjacent, disease-overlapping
+elements and assembles per-element evidence into a ranked shortlist.
+
+Pipeline stages (see the driver script ``run_pipeline.py``):
+    download   -- cached, hashed, provenance-logged data fetches
+    filters    -- Phase 1 funnel: constraint ∩ neurodev-gene proximity ∩ GWAS
+    evidence   -- Phase 2 per-element evidence spine
+    score      -- Phase 3 transparent additive evidence score
+"""
+__version__ = "1.0.0"
