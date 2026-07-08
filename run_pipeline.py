@@ -60,6 +60,13 @@ def main(argv=None):
     ap.add_argument("--peaks", type=str,
                     default="ENCFF660HML_brain_embryo105d_DNase_peaks_hg38.bed.gz",
                     help="Developing-brain DNase peaks bed.gz filename under data/")
+    ap.add_argument("--midfetal-window", type=str, default="10,24",
+                    help="Mid-fetal convergence window in post-conception weeks, "
+                         "'lo,hi' (default 10,24). Drives the temporal axis.")
+    ap.add_argument("--brainspan", type=str, default=None,
+                    help="Optional local BrainSpan zip path (else fetched from Allen).")
+    ap.add_argument("--no-temporal", action="store_true",
+                    help="Skip the BrainSpan temporal axis (reproduces the pre-temporal v1 spine).")
     ap.add_argument("--sfari", type=str, default=None,
                     help="Optional SFARI gene-list CSV (column 'gene-symbol'); unioned into neurodev set")
     ap.add_argument("--force-download", action="store_true")
@@ -67,7 +74,8 @@ def main(argv=None):
     args = ap.parse_args(argv)
 
     sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
-    from har_annotator import download as dl, data_io, references, filters, evidence, score
+    from har_annotator import (download as dl, data_io, references, filters,
+                               evidence, score, temporal)
 
     out = pathlib.Path(args.outdir)
     out.mkdir(parents=True, exist_ok=True)
@@ -109,6 +117,17 @@ def main(argv=None):
     # ---- Stage 2: evidence spine -------------------------------------------
     print("[2] assembling evidence spine ...")
     ev = evidence.assemble(cand, plac, neuro, dl.DATA_DIR / args.peaks)
+
+    # ---- Stage 2b: temporal axis (developmental timing) --------------------
+    if not args.no_temporal:
+        lo, hi = (int(x) for x in args.midfetal_window.split(","))
+        print(f"[2b] BrainSpan temporal axis (mid-fetal window {lo}-{hi} pcw) ...")
+        traj = temporal.build_brainspan_trajectories(
+            midfetal=(lo, hi), brainspan_zip=args.brainspan, force=args.force_download)
+        ev = temporal.annotate_temporal(ev, traj)
+        print(f"    genes timed={ev['gene_peak_pcw'].notna().sum()}  "
+              f"peaking in mid-fetal window={int(ev['gene_in_midfetal'].sum())}")
+
     ev.to_parquet(out / "har_evidence.parquet")
     print(f"    evidence table {ev.shape}  plac-linked={ev.gene_assignment_method.eq('plac_linked').sum()}"
           f"  brain-active={ev.brain_dnase_overlap.sum()}")
