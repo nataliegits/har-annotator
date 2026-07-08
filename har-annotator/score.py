@@ -17,7 +17,9 @@ gene           : neurodev-gene link quality — DDG2P confidence tier, boosted i
 disease        : neuropsychiatric GWAS overlap — significance (−log10 p) and
                  proximity to the lead SNP
 brain          : active in the developing brain — ENCODE embryonic-cortex DNase
-                 peak overlap (+ PLAC-seq ATAC support)
+                 peak overlap (+ PLAC-seq ATAC support)  ["where"]
+temporal       : target gene's prenatal expression concentrated in the mid-fetal
+                 convergence window (~10-24 pcw), from BrainSpan  ["when"]
 motif          : reserved (0 unless a motif-disruption annotation is supplied)
 """
 from __future__ import annotations
@@ -25,17 +27,25 @@ from __future__ import annotations
 import numpy as np
 import pandas as pd
 
-COMPONENTS = ["constraint", "acceleration", "gene", "disease", "brain", "motif"]
+COMPONENTS = ["constraint", "acceleration", "gene", "disease", "brain", "temporal", "motif"]
 
-# Default weights — deliberately simple and legible. Constraint + disease +
-# gene carry the most weight (they define the biological question); brain
-# activity and acceleration are supporting; motif is reserved.
+# Default weights — deliberately simple and legible, and they sum to 1.0.
+# Constraint + disease + gene carry the most weight (they define the biological
+# question); brain activity ("where") and temporal ("when") are the paired
+# developmental-context axes; acceleration is a supporting proxy; motif reserved.
+#
+# NOTE: adding the temporal axis re-normalizes the six original weights, so this
+# default will re-rank relative to the shipped v1 shortlist (that is the point —
+# it introduces the developmental clock). To reproduce the original v1 ranking,
+# run with the pre-temporal weights and temporal=0, e.g.:
+#   --weights constraint=0.20,acceleration=0.10,gene=0.25,disease=0.25,brain=0.15,temporal=0,motif=0.05
 WEIGHTS = {
-    "constraint": 0.20,
-    "acceleration": 0.10,
-    "gene": 0.25,
-    "disease": 0.25,
-    "brain": 0.15,
+    "constraint": 0.18,
+    "acceleration": 0.07,
+    "gene": 0.22,
+    "disease": 0.22,
+    "brain": 0.13,
+    "temporal": 0.13,
     "motif": 0.05,
 }
 
@@ -80,6 +90,11 @@ def compute_scores(ev: pd.DataFrame, weights: dict | None = None,
     # brain: DNase peak overlap (0.8) + PLAC-seq ATAC support (0.2)
     df["score_brain"] = (df["brain_dnase_overlap"].astype(float) * 0.8
                          + df["plac_atac"].fillna(False).astype(float) * 0.2)
+
+    # temporal: fraction of the target gene's PRENATAL expression that falls in
+    # the mid-fetal convergence window (BrainSpan). Missing gene -> 0.
+    df["score_temporal"] = (pd.to_numeric(df.get("gene_midfetal_frac", 0.0),
+                                          errors="coerce").fillna(0.0).clip(0, 1))
 
     # motif: reserved
     if "score_motif" not in df:
