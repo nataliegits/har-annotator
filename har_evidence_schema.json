@@ -17,9 +17,9 @@
   "gwas_distance": "bp from HAR to the GWAS lead SNP",
   "gwas_study": "GWAS Catalog study / PubMed",
   "brain_dnase_overlap": "HAR overlaps an ENCODE embryonic-brain DNase peak (bool)",
-  "brain_dnase_peak": "peak id if overlapping"
+  "brain_dnase_peak": "peak id if overlapping",
   "temporal_gene": "target gene used for timing (plac_gene if linked, else nearest neurodev gene)",
   "gene_peak_pcw": "post-conception week of peak PRENATAL expression of the target gene (BrainSpan)",
-  "gene_midfetal_frac": "fraction of the target gene's prenatal expression inside the mid-fetal window (~10-24 pcw) [0,1]",
+  "gene_midfetal_frac": "fraction of the target gene's prenatal expression inside the mid-fetal window [0,1]",
   "gene_in_midfetal": "whether the prenatal expression peak falls inside the mid-fetal window (bool)"
 }
