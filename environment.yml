@@ -15,3 +15,6 @@ dependencies:
   - biopython
   - pyarrow
   - openpyxl
+  - pip
+  - pip:
+      - pyjaspar

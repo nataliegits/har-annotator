@@ -13,5 +13,6 @@ requests
 pyranges==0.1.4
 pyBigWig
 biopython
+pyjaspar
 pyarrow
 openpyxl

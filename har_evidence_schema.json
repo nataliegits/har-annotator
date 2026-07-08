@@ -21,5 +21,15 @@
   "temporal_gene": "target gene used for timing (plac_gene if linked, else nearest neurodev gene)",
   "gene_peak_pcw": "post-conception week of peak PRENATAL expression of the target gene (BrainSpan)",
   "gene_midfetal_frac": "fraction of the target gene's prenatal expression inside the mid-fetal window [0,1]",
-  "gene_in_midfetal": "whether the prenatal expression peak falls inside the mid-fetal window (bool)"
+  "gene_in_midfetal": "whether the prenatal expression peak falls inside the mid-fetal window (bool)",
+  "n_substitutions": "Human\u2013chimp substitutions in the HAR (from panTro5 ortholog alignment)",
+  "n_indels": "Insertion/deletion columns in the human\u2013chimp alignment",
+  "aln_length": "Aligned length (columns) of the human\u2013chimp global alignment",
+  "subst_rate": "Substitutions per aligned bp \u2014 real acceleration signal (replaces width proxy)",
+  "n_motifs_human": "JASPAR2024 CORE vertebrate TF motifs present in the human allele (FPR 1e-4)",
+  "n_motifs_chimp": "Same, chimp (panTro5) allele",
+  "n_motif_gained": "TF motifs present in human but not chimp (human-created sites)",
+  "n_motif_lost": "TF motifs present in chimp but not human (human-destroyed sites)",
+  "motif_disruption": "n_motif_gained + n_motif_lost \u2014 drives the motif axis",
+  "motif_tfs": "Semicolon list of gained (+) / lost (-) TF names"
 }

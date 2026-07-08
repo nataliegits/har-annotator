@@ -65,6 +65,14 @@ def main(argv=None):
                          "'lo,hi' (default 10,24). Drives the temporal axis.")
     ap.add_argument("--brainspan", type=str, default=None,
                     help="Optional local BrainSpan zip path (else fetched from Allen).")
+    ap.add_argument("--supp-xlsx", type=str, default="cui2025_HAR_supp4.xlsx",
+                    help="Cui 2025 Supplemental Table 2 (has hg38 + panTro5 HAR coords)")
+    ap.add_argument("--no-seq-axes", action="store_true",
+                    help="skip ortholog fetch; acceleration falls back to the width proxy, motif=0")
+    ap.add_argument("--no-motif", action="store_true",
+                    help="compute real acceleration but skip the JASPAR motif scan")
+    ap.add_argument("--motif-fpr", type=float, default=1e-4,
+                    help="per-motif false-positive-rate threshold for TFBS calls")
     ap.add_argument("--no-temporal", action="store_true",
                     help="Skip the BrainSpan temporal axis (reproduces the pre-temporal v1 spine).")
     ap.add_argument("--sfari", type=str, default=None,
@@ -75,7 +83,7 @@ def main(argv=None):
 
     sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
     from har_annotator import (download as dl, data_io, references, filters,
-                               evidence, score, temporal)
+                               evidence, score, temporal, acceleration, motif)
 
     out = pathlib.Path(args.outdir)
     out.mkdir(parents=True, exist_ok=True)
@@ -127,6 +135,24 @@ def main(argv=None):
         ev = temporal.annotate_temporal(ev, traj)
         print(f"    genes timed={ev['gene_peak_pcw'].notna().sum()}  "
               f"peaking in mid-fetal window={int(ev['gene_in_midfetal'].sum())}")
+
+    # ---- Stage 2c: real acceleration + motif disruption --------------------
+    # Fetch human (hg38) + chimp (panTro5) HAR orthologs and derive the real
+    # substitution burden and JASPAR TF-motif gains/losses. Both replace the
+    # earlier proxies (HAR width; motif=0). Sequence fetches are cached.
+    if not args.no_seq_axes:
+        print("[2c] ortholog sequences -> substitution burden + motif disruption ...")
+        coords = acceleration.load_ortholog_coords(dl.DATA_DIR / args.supp_xlsx)
+        seqs = acceleration.fetch_ortholog_sequences(
+            coords, har_ids=list(ev.har_id),
+            cache_path=str(dl.DATA_DIR / "har_ortholog_seqs.parquet"))
+        ev = acceleration.annotate_acceleration(ev, seqs)
+        if not args.no_motif:
+            ev = motif.annotate_motifs(ev, seqs, fpr=args.motif_fpr)
+        n_sub = ev["subst_rate"].notna().sum()
+        print(f"    sequences={len(seqs)}  subst_rate computed={n_sub}"
+              + (f"  motif disruption median={int(ev['motif_disruption'].median())}"
+                 if not args.no_motif else "  (motif skipped)"))
 
     ev.to_parquet(out / "har_evidence.parquet")
     print(f"    evidence table {ev.shape}  plac-linked={ev.gene_assignment_method.eq('plac_linked').sum()}"

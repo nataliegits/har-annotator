@@ -16,6 +16,8 @@ UTC access date, SHA256, and byte size.
 | 3 | **Neurodevelopmental genes** — Gene2Phenotype Developmental Disorders (DDG2P) | `DDG2P_2026-06-28.csv.gz` | 2,860 gene–disease records | Gene symbol, confidence category, disease, allelic requirement, MONDO. |
 | 4 | **Disease loci** — EBI GWAS Catalog, ontology-annotated associations | `gwas-catalog-associations_ontology-annotated-full.zip` | 1,150,105 associations | hg38 (`CHR_ID`/`CHR_POS`). ~33,400 rows match neuropsychiatric/neurodevelopmental traits (schizophrenia, autism, bipolar, ADHD, educational attainment, cognition, depression, epilepsy, intellectual disability). |
 | 5 | **Developing-brain regulatory context** — ENCODE DNase-seq peaks, human brain embryo (105 days) | `ENCFF660HML_…_hg38.bed.gz` | 165,568 peaks | True mid-gestation cortex (embryonic life-stage), GRCh38. Used for "is this HAR an active regulatory element in the developing brain?" |
+| 6 | **HAR orthologous sequences** — UCSC sequence REST API (`api.genome.ucsc.edu/getData/sequence`) | `har_ortholog_seqs.parquet` (cache) | 363 HAR pairs | Human (hg38) + chimp (panTro5) sequence for each candidate HAR, coordinates from Cui Supplemental Table 2 ("HARs information" sheet). Drives the real human–chimp substitution-rate acceleration axis. 0-based half-open; fetched per element with retry. |
+| 7 | **TF motifs** — JASPAR2024 CORE vertebrates, via `pyjaspar` | `jaspar2024_fpr1e-4_thresholds.json` (per-motif thresholds) | 879 PWMs | Loaded fully offline through `pyjaspar` (`jaspardb(release="JASPAR2024")`). Both HAR alleles scanned; per-motif false-positive-rate thresholds (1e-4) precomputed once and cached. Drives the motif gain/loss axis. |
 
 ## Stretch sources — obtained
 
@@ -36,14 +38,20 @@ UTC access date, SHA256, and byte size.
   filter remains well-grounded; autism-specific genes are still represented via
   DDG2P entries. The pipeline is written so a SFARI CSV can be dropped in and
   unioned if it becomes available.
-- **Acceleration score / human-substitution count — not in the coordinate
-  source.** The Cui 2025 HAR table provides coordinates and chimp orthologs but
-  not a per-HAR substitution count or acceleration score. Acceleration evidence
-  in the scoring is therefore derived from **HAR width** (a proxy for
-  substitution burden used cautiously) and the phyloP constraint signal, and this
-  limitation is stated explicitly in the evidence schema. A substitution count
-  can be added later by aligning human vs. chimp ortholog sequences (both
-  coordinate sets are present).
+- **Acceleration score — RESOLVED (was a documented gap).** The Cui 2025 HAR
+  table provides no per-HAR substitution count, so acceleration was originally a
+  HAR-width proxy. This is now replaced with a **real human–chimp substitution
+  rate**: the human (hg38) and chimp (panTro5) orthologous sequences are fetched
+  (source 6), globally aligned, and substitutions per aligned bp computed
+  (`acceleration.py`). The former width proxy was verified to carry essentially
+  no divergence signal (Pearson r ≈ −0.07 vs the real rate), which motivated the
+  upgrade. Remaining limitation: the rate is human–chimp divergence, not strictly
+  human-branch — polarizing it needs an outgroup (macaque) or a phyloP branch
+  model. Stated in the evidence schema and README caveats.
+- **TF-motif disruption — RESOLVED (was reserved).** The motif axis, previously
+  hard-coded to 0, now scans both alleles against 879 JASPAR2024 CORE vertebrate
+  PWMs (source 7) and scores TF sites gained/lost (`motif.py`). Limitation:
+  presence/absence at a fixed FPR, not a quantitative affinity model.
 - **Constraint fallback not needed.** The brief flagged the phyloP bigWig as the
   main risk; remote querying is fast, so per-element phyloP is used directly. The
   470-way phastCons constrained-element bigBed remains available at UCSC as a
