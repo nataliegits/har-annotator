@@ -24,35 +24,51 @@ python run_pipeline.py            # reproduces the shipped shortlist exactly
 | B | Within 1 Mb of a neurodevelopmental-disorder gene TSS | 1,718 |
 | C | Within 25 kb of a genome-wide-significant neuropsychiatric GWAS lead SNP | **363** |
 
-The 363 candidates are then scored on six axes and ranked. Top candidate:
+The 363 candidates are then scored on seven axes and ranked. Top candidate:
 **HAR_575 → *POC1B*** (PLAC-seq-linked, educational-attainment GWAS overlap,
 embryonic-brain DNase-active). Classic neurodevelopmental / human-evolution
 genes recovered in the shortlist include *ZEB2, TCF4, MEF2C, PHOX2B, TCF20,
-ZSWIM6, FOXP2, SOX5, NR4A2, MITF*.
+ZSWIM6, FOXP2, SOX5, NR4A2, MITF*. The seventh axis, **temporal**, adds a
+developmental clock: how concentrated each target gene's prenatal expression is
+in the mid-fetal convergence window (~10–24 post-conception weeks, BrainSpan) —
+the developmental moment where human-specific regulation and neuropsychiatric
+risk are thought to coincide. Of the 363 candidates, 347 target genes could be
+timed and 129 peak inside the mid-fetal window.
 
 ---
 
 ## The transparent score
 
-The total is a **weighted sum of six normalized (0–1) component scores** — no
+The total is a **weighted sum of seven normalized (0–1) component scores** — no
 black box. Every `score_<c>` and its weighted `contrib_<c>` is retained as a
-column, so `total_score` decomposes exactly.
+column, so `total_score` decomposes exactly (verified: max reconstruction
+error 0.0).
 
 ```
-total_score = Σ  WEIGHTS[c] · score_c        (c in the six components below)
+total_score = Σ  WEIGHTS[c] · score_c        (c in the seven components below)
 ```
 
 | Component | Default weight | Evidence |
 |-----------|:-:|----------|
-| `constraint`   | 0.20 | mean 241-way phyloP, min-max scaled |
-| `gene`         | 0.25 | DDG2P confidence tier × TSS-distance decay, +0.15 if PLAC-seq-linked |
-| `disease`      | 0.25 | −log10(GWAS p) × proximity to lead SNP |
-| `brain`        | 0.15 | ENCODE embryonic-brain DNase peak overlap (+ PLAC-seq ATAC support) |
-| `acceleration` | 0.10 | HAR width (log-scaled) — **proxy**, see caveats |
+| `constraint`   | 0.18 | mean 241-way phyloP, min-max scaled |
+| `gene`         | 0.22 | DDG2P confidence tier × TSS-distance decay, +0.15 if PLAC-seq-linked |
+| `disease`      | 0.22 | −log10(GWAS p) × proximity to lead SNP |
+| `brain`        | 0.13 | ENCODE embryonic-brain DNase peak overlap (+ PLAC-seq ATAC support) — *where* |
+| `temporal`     | 0.13 | fraction of target gene's prenatal expression in the mid-fetal window (BrainSpan) — *when* |
+| `acceleration` | 0.07 | HAR width (log-scaled) — **proxy**, see caveats |
 | `motif`        | 0.05 | reserved (0 unless a motif-disruption annotation is supplied) |
 
-Weights are module constants (`har_annotator/score.py`) and overridable per run:
-`python run_pipeline.py --weights gene=0.35,disease=0.30`.
+Weights sum to 1.0 and are module constants (`har_annotator/score.py`),
+overridable per run: `python run_pipeline.py --weights gene=0.35,disease=0.30`.
+`brain` (*where* a target gene is active) and `temporal` (*when* it is active)
+are the paired developmental-context axes.
+
+**Note on the temporal axis and reproducibility.** Adding `temporal` as a
+seventh axis re-normalized the six original weights, so the default ranking now
+incorporates the developmental clock and differs from the pre-temporal v1
+shortlist (this is intended — it is the whole point of the axis). To reproduce
+the exact pre-temporal v1 ranking, run with `--no-temporal`, which skips the
+BrainSpan stage and restores the six-axis spine.
 
 ---
 
@@ -80,6 +96,9 @@ Key parameters (all have defaults that reproduce the shipped shortlist):
 | `--gwas-window`  | 25_000 | Step C max HAR–lead-SNP distance (bp) |
 | `--gwas-pval`    | 5e-8 | GWAS genome-wide significance cutoff |
 | `--weights`      | — | override score weights, `k=v,k=v` |
+| `--midfetal-window` | 10,24 | mid-fetal convergence window (post-conception weeks) for the temporal axis |
+| `--no-temporal`  | off | skip the BrainSpan temporal axis (reproduces the pre-temporal v1 spine) |
+| `--brainspan`    | — | optional local BrainSpan zip path (else fetched from Allen Institute) |
 | `--sfari`        | — | optional SFARI gene CSV, unioned into the neurodev set |
 | `--force-download` | off | re-fetch all sources instead of using the cache |
 
@@ -100,7 +119,8 @@ notes.
 | **Constraint** — Zoonomia 241-way phyloP | per-HAR mean/max phyloP | *(remote query, not cached)* | `filters.annotate_phylop` |
 | **Neurodev genes** — DDG2P (Gene2Phenotype) | 2,524 genes → hg38 coords + confidence tier | `ddg2p`, `refgene_hg38` | `references.build_neurodev` |
 | **GWAS** — EBI GWAS Catalog (ontology-annotated) | 22,489 genome-wide-sig neuropsychiatric lead SNPs | `gwas_assoc` | `references.build_gwas_loci` |
-| **Developing brain** — ENCODE embryonic-brain DNase-seq | 165,568 peaks; regulatory-activity axis | `fetal_brain_dnase` | `evidence.annotate_brain_dnase` |
+| **Developing brain** — ENCODE embryonic-brain DNase-seq | 165,568 peaks; regulatory-activity axis (*where*) | `fetal_brain_dnase` | `evidence.annotate_brain_dnase` |
+| **Developmental transcriptome** — BrainSpan (Allen Institute) | per-gene prenatal expression → mid-fetal timing axis (*when*) | `brainspan_devtx` | `temporal.build_brainspan_trajectories` |
 | **Gene coords** — UCSC refGene hg38 | gene symbol → strand-aware TSS | `refgene_hg38` | `references.build_genes` |
 | **TF motifs** | *(reserved — not wired in; `motif` score = 0)* | — | — |
 
@@ -153,6 +173,15 @@ re-fetches and hash-verifies them from the URLs below.
   portal update", doi:[10.1093/nar/gkx1081](https://doi.org/10.1093/nar/gkx1081);
   consortium: The ENCODE Project Consortium (2012), *Nature*,
   doi:[10.1038/nature11247](https://doi.org/10.1038/nature11247).
+- **Developmental transcriptome — BrainSpan Atlas of the Developing Human Brain**
+  (Allen Institute for Brain Science). "RNA-Seq Gencode v10 summarized to genes."
+  Portal / download: [www.brainspan.org](https://www.brainspan.org)
+  (Developmental Transcriptome → Download). Primary paper: Miller *et al.* (2014),
+  *Nature* 508:199–206 — "Transcriptional landscape of the prenatal human brain",
+  doi:[10.1038/nature13185](https://doi.org/10.1038/nature13185)
+  ([PMC4105188](https://pmc.ncbi.nlm.nih.gov/articles/PMC4105188/)). Used for the
+  `temporal` axis: per-gene prenatal expression trajectories and the fraction
+  falling in the mid-fetal convergence window (~10–24 pcw).
 - **Neuropsychiatric GWAS — NHGRI-EBI GWAS Catalog** (ontology-annotated
   associations, latest release).
   Download: `https://ftp.ebi.ac.uk/pub/databases/gwas/releases/latest/gwas-catalog-associations_ontology-annotated-full.zip`;
@@ -210,6 +239,7 @@ har_annotator/
   filters.py     Phase-1 funnel: annotate_phylop, filter_constrained,
                  assign_nearest_gene, annotate_gwas, keep_gwas
   evidence.py    Phase-2 per-element evidence spine (assemble)
+  temporal.py    Phase-2b developmental-timing axis (build_brainspan_trajectories, annotate_temporal)
   score.py       Phase-3 transparent additive score (compute_scores, WEIGHTS)
 run_pipeline.py  end-to-end driver (parameterized)
 ```
