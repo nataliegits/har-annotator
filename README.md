@@ -1,10 +1,19 @@
 # HAR annotator
 
-A reproducible pipeline that filters **Human Accelerated Regions (HARs)** to
-constrained, neurodevelopment-adjacent, disease-overlapping elements, assembles
-a per-element evidence table, and ranks candidates with a **transparent
-additive score**, then interprets the top neurodevelopmental candidates with
-an antagonistic-pleiotropy framing.
+**Human Accelerated Regions (HARs)** are stretches of the genome that stayed
+frozen across mammalian evolution and then changed sharply on the human branch,
+which makes them prime suspects for what rewired the human brain. There are
+thousands of them, most fall in noncoding regulatory sequence, and the hard part
+is not finding them but deciding which ones are worth a closer look. This project
+is an attempt to do that prioritization honestly: take the full set of HARs and
+ask, for each one, whether the evidence actually lines up behind a role in human
+neurodevelopment, with every step of the reasoning left visible rather than hidden
+inside a model. The pipeline narrows the HARs to constrained,
+neurodevelopment-adjacent, disease-overlapping elements, assembles a per-element
+evidence table, ranks the survivors with a transparent additive score where each
+axis's contribution stays inspectable, and reads out the top candidates with an
+antagonistic-pleiotropy framing. The aim is a defensible shortlist of hypotheses,
+not a black-box answer.
 
 Everything is hg38. Every data pull is cached, hashed, and logged to
 `data/manifest.csv`, so the analysis replays end-to-end from source.
