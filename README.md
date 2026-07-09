@@ -3,7 +3,7 @@
 A reproducible pipeline that filters **Human Accelerated Regions (HARs)** to
 constrained, neurodevelopment-adjacent, disease-overlapping elements, assembles
 a per-element evidence table, and ranks candidates with a **transparent
-additive score** — then interprets the top neurodevelopmental candidates with
+additive score**, then interprets the top neurodevelopmental candidates with
 an antagonistic-pleiotropy framing.
 
 Everything is hg38. Every data pull is cached, hashed, and logged to
@@ -15,12 +15,50 @@ python run_pipeline.py            # reproduces the shipped shortlist exactly
 
 ---
 
-## What it does — the funnel
+## What This Pipeline Does
+
+HARs are stretches of DNA that stayed nearly frozen across mammals for millions
+of years, then changed suddenly in the human lineage. There are 3,257 of them,
+and most have no known function. This pipeline asks a narrower question: *which
+of these human-accelerated regions are the best candidates for shaping human
+brain development?*
+
+It works in five moves:
+
+1. **Filter (Phase 1).** Start from all 3,257 HARs and keep only those that pass
+   three tests in a row: evolutionarily constrained, sitting near a gene already
+   known to cause a neurodevelopmental disorder, and overlapping a genetic signal
+   for a brain-related trait. That drops 3,257 → **363**.
+2. **Gather evidence (Phase 2).** For each of the 363 survivors, record *how
+   strong* every line of evidence is: how conserved, which disease gene and how
+   close, how significant the trait signal, whether it's active in fetal brain
+   tissue, whether that gene is busiest during mid-fetal development, how much its
+   sequence diverged from chimpanzee, and how many transcription-factor binding
+   sites it disrupts.
+3. **Score (Phase 3).** Collapse that evidence into one number per HAR, a
+   transparent weighted sum, with every axis's contribution kept visible, and
+   rank them best-to-worst.
+4. **Interpret (Phase 4).** Read the top of the list and check that the ranking
+   makes biological sense, gene by gene.
+5. **Visualize & package (Phases 5–6).** Draw the figures and bundle everything
+   into a rerunnable package.
+
+**One honest precision.** This does *not* discover new disease genes. The disease
+genes came *in* as a filter (step 1 requires proximity to a known
+neurodevelopmental-disorder gene). What gets ranked is the **regulatory
+regions**: the output is a shortlist of candidate HARs, i.e. hypotheses about
+*which human-accelerated elements are worth studying* for a role in human brain
+development during fetal gestation. The genes are the input; the HARs are the
+result.
+
+---
+
+## What it does: the funnel
 
 | Step | Filter | HARs |
 |------|--------|------|
 | 0 | All HARs (Cui et al. 2025, *Nature*, hg38) | 3,257 |
-| A | Mammalian constraint — mean 241-way phyloP > 1.0 | 2,757 |
+| A | Mammalian constraint, mean 241-way phyloP > 1.0 | 2,757 |
 | B | Within 1 Mb of a neurodevelopmental-disorder gene TSS | 1,718 |
 | C | Within 25 kb of a genome-wide-significant neuropsychiatric GWAS lead SNP | **363** |
 
@@ -30,7 +68,7 @@ embryonic-brain DNase-active). Classic neurodevelopmental / human-evolution
 genes recovered in the shortlist include *ZEB2, TCF4, MEF2C, PHOX2B, TCF20,
 ZSWIM6, FOXP2, SOX5, NR4A2, MITF*. The seventh axis, **temporal**, adds a
 developmental clock: how concentrated each target gene's prenatal expression is
-in the mid-fetal convergence window (~10–24 post-conception weeks, BrainSpan) —
+in the mid-fetal convergence window (~10–24 post-conception weeks, BrainSpan),
 the developmental moment where human-specific regulation and neuropsychiatric
 risk are thought to coincide. Of the 363 candidates, 347 target genes could be
 timed and 129 peak inside the mid-fetal window.
@@ -39,7 +77,7 @@ timed and 129 peak inside the mid-fetal window.
 
 ## The transparent score
 
-The total is a **weighted sum of seven normalized (0–1) component scores** — no
+The total is a **weighted sum of seven normalized (0–1) component scores**, no
 black box. Every `score_<c>` and its weighted `contrib_<c>` is retained as a
 column, so `total_score` decomposes exactly (verified: max reconstruction
 error 0.0).
@@ -53,8 +91,8 @@ total_score = Σ  WEIGHTS[c] · score_c        (c in the seven components below)
 | `constraint`   | 0.18 | mean 241-way phyloP, min-max scaled |
 | `gene`         | 0.22 | DDG2P confidence tier × TSS-distance decay, +0.15 if PLAC-seq-linked |
 | `disease`      | 0.22 | −log10(GWAS p) × proximity to lead SNP |
-| `brain`        | 0.13 | ENCODE embryonic-brain DNase peak overlap (+ PLAC-seq ATAC support) — *where* |
-| `temporal`     | 0.13 | fraction of target gene's prenatal expression in the mid-fetal window (BrainSpan) — *when* |
+| `brain`        | 0.13 | ENCODE embryonic-brain DNase peak overlap (+ PLAC-seq ATAC support), *where* |
+| `temporal`     | 0.13 | fraction of target gene's prenatal expression in the mid-fetal window (BrainSpan), *when* |
 | `acceleration` | 0.07 | real human–chimp substitution rate from the panTro5 ortholog alignment (subs / aligned bp), min-max scaled |
 | `motif`        | 0.05 | JASPAR TF-motif sites gained + lost between the human and chimp alleles, min-max scaled |
 
@@ -72,42 +110,42 @@ the axis counts toward the total. Both numbers are kept as columns
 (`score_<c>` and `contrib_<c>`), so nothing is hidden. Listed
 heaviest-weighted first:
 
-1. **gene — weight 0.22.** Score = `confidence × distance_decay + plac_boost`.
+1. **gene, weight 0.22.** Score = `confidence × distance_decay + plac_boost`.
    The DDG2P tier becomes a number (definitive 1.0 → strong 0.75 → moderate 0.5
    → limited 0.3), multiplied by `1 − distance/1Mb` (a gene at the HAR ≈ 1, one
    at the 1 Mb edge ≈ 0), plus a flat **+0.15** if the gene came from a
    PLAC-seq physical contact rather than mere proximity. Clipped to [0,1]. Tied
    for the highest weight because gene-link quality is core to the hypothesis.
-2. **disease — weight 0.22.** Score = `significance × proximity`. Significance
+2. **disease, weight 0.22.** Score = `significance × proximity`. Significance
    is −log₁₀(p), capped at 50 then divided by 50 (p=5e-8 weak → p=1e-50 maxed);
    proximity is `1 − gwas_distance/25kb`. Multiplied, so a HAR needs **both** a
    strong signal **and** to sit close to the lead SNP. Tied at the top with
-   gene — together they define the biological question.
-3. **constraint — weight 0.18.** Score = min-max scaled `phylop_mean` across
+   gene, together they define the biological question.
+3. **constraint, weight 0.18.** Score = min-max scaled `phylop_mean` across
    the 363 candidates (least-constrained → 0, most → 1). The evolutionary
    anchor, just below the two biological axes.
-4. **brain "where" — weight 0.13.** Score = `0.8 × dnase_overlap + 0.2 ×
+4. **brain "where", weight 0.13.** Score = `0.8 × dnase_overlap + 0.2 ×
    plac_atac`. Mostly the ENCODE embryonic-brain DNase overlap (0.8), topped up
    by PLAC-seq ATAC support (0.2); a HAR in fetal-brain open chromatin with
    neuronal ATAC support reaches 1.0. One of the paired developmental-context
    axes.
-5. **temporal "when" — weight 0.13.** Score = `gene_midfetal_frac` — the
+5. **temporal "when", weight 0.13.** Score = `gene_midfetal_frac`, the
    fraction of the target gene's prenatal expression falling inside the
    mid-fetal window (10–24 pcw), clipped to [0,1]; no BrainSpan trajectory → 0.
    Weighted equal to brain, its "where/when" partner.
-6. **acceleration — weight 0.07.** Score = min-max scaled `subst_rate`, the
+6. **acceleration, weight 0.07.** Score = min-max scaled `subst_rate`, the
    **real** human–chimp substitution rate: we fetch each HAR's human (hg38) and
    chimpanzee (panTro5) orthologous sequence, align them, and count
    substitutions per aligned bp. This replaces the earlier HAR-width proxy
-   (which, we verified, was uncorrelated with real divergence — Pearson r ≈
+   (which, we verified, was uncorrelated with real divergence, Pearson r ≈
    −0.07). Weight stays low at 0.07 because divergence is not lineage-polarized
    (see caveat below), but it is now a genuine measurement, not a placeholder.
-7. **motif — weight 0.05.** Score = min-max scaled `motif_disruption`, the
+7. **motif, weight 0.05.** Score = min-max scaled `motif_disruption`, the
    number of JASPAR transcription-factor binding sites **gained or lost**
    between the human and chimp alleles (scan both sequences against 879
    JASPAR2024 CORE vertebrate motifs at a per-motif false-positive rate of
    1e-4; a site "present" in one allele but not the other counts as a
-   disruption). This is the direct sequence-to-function signal — which TF
+   disruption). This is the direct sequence-to-function signal, which TF
    binding sites the human-specific changes create or destroy. Previously
    hard-coded to 0; now live.
 
@@ -116,7 +154,7 @@ The seven weights sum to 1.0, so the **total_score** is itself a 0–1 number:
 the total adds back up exactly (verified at 0.0 reconstruction error) and you
 can see precisely how many points each axis gave each HAR. Two properties are
 worth keeping in mind: the weights are hand-set priors, overridable with
-`--weights`; and three axes — `constraint`, `acceleration`, and `motif` — are
+`--weights`; and three axes (`constraint`, `acceleration`, and `motif`) are
 scaled *relative to the candidate set* (min-max), while `gene`, `disease`,
 `brain`, and `temporal` use fixed, absolute transforms that do not shift when
 the funnel changes.
@@ -124,7 +162,7 @@ the funnel changes.
 **Note on the temporal axis and reproducibility.** Adding `temporal` as a
 seventh axis re-normalized the six original weights, so the default ranking now
 incorporates the developmental clock and differs from the pre-temporal v1
-shortlist (this is intended — it is the whole point of the axis). To reproduce
+shortlist (this is intended; it is the whole point of the axis). To reproduce
 the exact pre-temporal v1 ranking, run with `--no-temporal`, which skips the
 BrainSpan stage and restores the six-axis spine.
 
@@ -141,7 +179,7 @@ ZSWIM6/HAR_2378). To reproduce the pre-upgrade axes, run with `--no-seq-axes`.
 ## Install & run
 
 ```bash
-# conda env (Python 3.11 — pyranges pins <3.13)
+# conda env (Python 3.11; pyranges pins <3.13)
 conda create -n hars -c bioconda -c conda-forge python=3.11 \
     pandas numpy scipy matplotlib seaborn requests \
     pyranges=0.1.4 pybigwig biopython pyarrow openpyxl
@@ -161,14 +199,14 @@ Key parameters (all have defaults that reproduce the shipped shortlist):
 | `--gene-window`  | 1_000_000 | Step B max HAR–TSS distance (bp) |
 | `--gwas-window`  | 25_000 | Step C max HAR–lead-SNP distance (bp) |
 | `--gwas-pval`    | 5e-8 | GWAS genome-wide significance cutoff |
-| `--weights`      | — | override score weights, `k=v,k=v` |
+| `--weights`      | - | override score weights, `k=v,k=v` |
 | `--midfetal-window` | 10,24 | mid-fetal convergence window (post-conception weeks) for the temporal axis |
 | `--no-seq-axes`  | off | skip the ortholog fetch; acceleration falls back to the width proxy and motif = 0 (reproduces the pre-upgrade axes) |
 | `--no-motif`     | off | compute real acceleration but skip the JASPAR motif scan |
 | `--motif-fpr`    | 1e-4 | per-motif false-positive rate for TF-binding-site calls |
 | `--no-temporal`  | off | skip the BrainSpan temporal axis (reproduces the pre-temporal v1 spine) |
-| `--brainspan`    | — | optional local BrainSpan zip path (else fetched from Allen Institute) |
-| `--sfari`        | — | optional SFARI gene CSV, unioned into the neurodev set |
+| `--brainspan`    | - | optional local BrainSpan zip path (else fetched from Allen Institute) |
+| `--sfari`        | - | optional SFARI gene CSV, unioned into the neurodev set |
 | `--force-download` | off | re-fetch all sources instead of using the cache |
 
 GWAS-window sensitivity (candidate count): 10 kb → 196, **25 kb → 363**,
@@ -184,34 +222,34 @@ notes.
 
 | Source | Used for | manifest row | builder / consumer |
 |--------|----------|:-:|:-:|
-| **HARs & PLAC-seq** — Cui et al. 2025, *Nature* | 3,257 HARs, hg38-native; neuronal PLAC-seq HAR→gene links | `hars_bed`, `hars_meta`, `cui2025_supp4` | `data_io.py`, `references.build_plac_links` |
-| **Constraint** — Zoonomia 241-way phyloP | per-HAR mean/max phyloP | *(remote query, not cached)* | `filters.annotate_phylop` |
-| **Neurodev genes** — DDG2P (Gene2Phenotype) | 2,524 genes → hg38 coords + confidence tier | `ddg2p`, `refgene_hg38` | `references.build_neurodev` |
-| **GWAS** — EBI GWAS Catalog (ontology-annotated) | 22,489 genome-wide-sig neuropsychiatric lead SNPs | `gwas_assoc` | `references.build_gwas_loci` |
-| **Developing brain** — ENCODE embryonic-brain DNase-seq | 165,568 peaks; regulatory-activity axis (*where*) | `fetal_brain_dnase` | `evidence.annotate_brain_dnase` |
-| **Developmental transcriptome** — BrainSpan (Allen Institute) | per-gene prenatal expression → mid-fetal timing axis (*when*) | `brainspan_devtx` | `temporal.build_brainspan_trajectories` |
-| **Gene coords** — UCSC refGene hg38 | gene symbol → strand-aware TSS | `refgene_hg38` | `references.build_genes` |
-| **HAR orthologs** — UCSC sequence API (hg38 + panTro5) | per-HAR human/chimp sequence → substitution rate (acceleration axis) | `har_ortholog_seqs` | `acceleration.py` |
-| **TF motifs** — JASPAR2024 CORE vertebrates (879 PWMs, via `pyjaspar`) | TF-binding sites gained/lost between alleles (motif axis) | `jaspar_thresholds` | `motif.py` |
+| **HARs & PLAC-seq**, Cui et al. 2025, *Nature* | 3,257 HARs, hg38-native; neuronal PLAC-seq HAR→gene links | `hars_bed`, `hars_meta`, `cui2025_supp4` | `data_io.py`, `references.build_plac_links` |
+| **Constraint**, Zoonomia 241-way phyloP | per-HAR mean/max phyloP | *(remote query, not cached)* | `filters.annotate_phylop` |
+| **Neurodev genes**, DDG2P (Gene2Phenotype) | 2,524 genes → hg38 coords + confidence tier | `ddg2p`, `refgene_hg38` | `references.build_neurodev` |
+| **GWAS**, EBI GWAS Catalog (ontology-annotated) | 22,489 genome-wide-sig neuropsychiatric lead SNPs | `gwas_assoc` | `references.build_gwas_loci` |
+| **Developing brain**, ENCODE embryonic-brain DNase-seq | 165,568 peaks; regulatory-activity axis (*where*) | `fetal_brain_dnase` | `evidence.annotate_brain_dnase` |
+| **Developmental transcriptome**, BrainSpan (Allen Institute) | per-gene prenatal expression → mid-fetal timing axis (*when*) | `brainspan_devtx` | `temporal.build_brainspan_trajectories` |
+| **Gene coords**, UCSC refGene hg38 | gene symbol → strand-aware TSS | `refgene_hg38` | `references.build_genes` |
+| **HAR orthologs**, UCSC sequence API (hg38 + panTro5) | per-HAR human/chimp sequence → substitution rate (acceleration axis) | `har_ortholog_seqs` | `acceleration.py` |
+| **TF motifs**, JASPAR2024 CORE vertebrates (879 PWMs, via `pyjaspar`) | TF-binding sites gained/lost between alleles (motif axis) | `jaspar_thresholds` | `motif.py` |
 
 Every raw file's exact download URL, SHA-256, access date, and size is in
 `data/manifest.csv`; `phase0_sources.md` has the full de-risking notes. The
-raw files themselves are **not committed** (see `.gitignore`) — `download.py`
+raw files themselves are **not committed** (see `.gitignore`), `download.py`
 re-fetches and hash-verifies them from the URLs below.
 
 ### Primary references & direct links
 
-- **HARs & PLAC-seq map — Cui et al. (2025), *Nature* 640:991–999.**
+- **HARs & PLAC-seq map, Cui et al. (2025), *Nature* 640:991–999.**
   "Comparative characterization of human accelerated regions in neurons,"
   doi:[10.1038/s41586-025-08622-x](https://doi.org/10.1038/s41586-025-08622-x).
   Supplies both the 3,257 HAR coordinates **and** the neuronal PLAC-seq HAR→gene
-  map — they are the same table, not separate downloads. That table is the
+  map: they are the same table, not separate downloads. That table is the
   paper's **Supplementary Table 2** ("HAR and their chimpanzee ortholog
   interacting genes in neurons"); the map used here is its "Table-b: Genes
   interacting with HARs in human" sheet (1,303 HARs, 1,719 genes,
   genome-wide). **Note on numbering:** the download file is named
   `41586_2025_8622_MOESM4_ESM.xlsx` (Nature's *MOESM4* file id), but the table
-  it contains is Supplementary Table **2** — the MOESM file number and the
+  it contains is Supplementary Table **2**, the MOESM file number and the
   supplementary-table number do not correspond. This is *not* Supplementary
   Table 3, which is the separate CRISPRi-prioritized shortlist of ~20 HARs
   selected for functional validation. Fetched via the GitHub mirror
@@ -221,38 +259,38 @@ re-fetches and hash-verifies them from the URLs below.
 
   **Method note:** the HAR→gene links come from **PLAC-seq** (proximity
   ligation-assisted ChIP-seq, anchored on the H3K4me3 active-promoter mark) in
-  human and chimpanzee iPSC-derived neurons — a ChIP-anchored chromatin-contact
+  human and chimpanzee iPSC-derived neurons, a ChIP-anchored chromatin-contact
   assay, *not* generic Hi-C. Earlier drafts of this project called it "Hi-C";
   that was imprecise and has been corrected throughout, including the column
   names (`plac_gene`, `plac_type`, `plac_atac`, assignment `plac_linked`).
-- **Neurodevelopmental gene list — DDG2P, from Gene2Phenotype (G2P).**
+- **Neurodevelopmental gene list: DDG2P, from Gene2Phenotype (G2P).**
   Download: `https://ftp.ebi.ac.uk/pub/databases/gene2phenotype/G2P_data_downloads/2026_06_28/DDG2P_2026-06-28.csv.gz` (EBI).
   Portal: [www.ebi.ac.uk/gene2phenotype](https://www.ebi.ac.uk/gene2phenotype).
-  Primary paper: Thormann *et al.* (2024), *Genome Medicine* — "Curating genomic
+  Primary paper: Thormann *et al.* (2024), *Genome Medicine*: "Curating genomic
   disease-gene relationships with Gene2Phenotype (G2P)",
   doi:[10.1186/s13073-024-01398-1](https://doi.org/10.1186/s13073-024-01398-1)
   ([PMC11539801](https://pmc.ncbi.nlm.nih.gov/articles/PMC11539801/)); earlier
   G2P/VEP tool paper: Thormann *et al.* (2019), *Nature Communications*,
   doi:[10.1038/s41467-019-10016-3](https://doi.org/10.1038/s41467-019-10016-3).
-- **Developing-brain open chromatin — ENCODE DNase-seq `ENCFF660HML`.**
+- **Developing-brain open chromatin: ENCODE DNase-seq `ENCFF660HML`.**
   Peak file: [encodeproject.org/files/ENCFF660HML](https://www.encodeproject.org/files/ENCFF660HML/)
   (download: `@@download/ENCFF660HML.bed.gz`); parent experiment
   [ENCSR420RWU](https://www.encodeproject.org/experiments/ENCSR420RWU/)
   (brain, male embryo 105 days). Portal paper: Davis *et al.* (2018),
-  *Nucleic Acids Research* — "The Encyclopedia of DNA Elements (ENCODE): data
+  *Nucleic Acids Research*: "The Encyclopedia of DNA Elements (ENCODE): data
   portal update", doi:[10.1093/nar/gkx1081](https://doi.org/10.1093/nar/gkx1081);
   consortium: The ENCODE Project Consortium (2012), *Nature*,
   doi:[10.1038/nature11247](https://doi.org/10.1038/nature11247).
-- **Developmental transcriptome — BrainSpan Atlas of the Developing Human Brain**
+- **Developmental transcriptome: BrainSpan Atlas of the Developing Human Brain**
   (Allen Institute for Brain Science). "RNA-Seq Gencode v10 summarized to genes."
   Portal / download: [www.brainspan.org](https://www.brainspan.org)
   (Developmental Transcriptome → Download). Primary paper: Miller *et al.* (2014),
-  *Nature* 508:199–206 — "Transcriptional landscape of the prenatal human brain",
+  *Nature* 508:199–206: "Transcriptional landscape of the prenatal human brain",
   doi:[10.1038/nature13185](https://doi.org/10.1038/nature13185)
   ([PMC4105188](https://pmc.ncbi.nlm.nih.gov/articles/PMC4105188/)). Used for the
   `temporal` axis: per-gene prenatal expression trajectories and the fraction
   falling in the mid-fetal convergence window (~10–24 pcw).
-- **Neuropsychiatric GWAS — NHGRI-EBI GWAS Catalog** (ontology-annotated
+- **Neuropsychiatric GWAS: NHGRI-EBI GWAS Catalog** (ontology-annotated
   associations, latest release).
   Download: `https://ftp.ebi.ac.uk/pub/databases/gwas/releases/latest/gwas-catalog-associations_ontology-annotated-full.zip`;
   portal [www.ebi.ac.uk/gwas](https://www.ebi.ac.uk/gwas).
@@ -268,11 +306,11 @@ re-fetches and hash-verifies them from the URLs below.
   significant hits (p < 5×10⁻⁸) → 22,489 lead SNPs. The term list is a module
   constant and is meant to be edited. **Trait-mix caveat:** the largest
   contributors are *educational attainment*, *intelligence*, and *cognitive-
-  function* GWAS — behavioural/cognitive proxies with known social-environmental
+  function* GWAS, behavioural/cognitive proxies with known social-environmental
   confounding. "Overlaps an educational-attainment locus" is therefore a weaker
   biological claim than "overlaps a schizophrenia locus"; the shipped
   `mapped_trait` column lets you see which applies to each candidate.
-- **Constraint — Zoonomia 241-way phyloP** (Cactus 241-mammal alignment),
+- **Constraint: Zoonomia 241-way phyloP** (Cactus 241-mammal alignment),
   queried remotely from the UCSC bigWig (`hg38 cactus241way`); 9.6 GB, never
   downloaded. The phyloP scores themselves: Christmas *et al.* (2023),
   *Science* 380:eabn3943, "Evolutionary constraint and innovation across
@@ -281,12 +319,12 @@ re-fetches and hash-verifies them from the URLs below.
   Disease-mapping utility of base-pair mammalian constraint: Sullivan *et al.*
   (2023), *Science* 380:eabn2937,
   doi:[10.1126/science.abn2937](https://doi.org/10.1126/science.abn2937).
-- **Gene coordinates — UCSC refGene (hg38).**
+- **Gene coordinates: UCSC refGene (hg38).**
   `https://hgdownload.soe.ucsc.edu/goldenPath/hg38/database/refGene.txt.gz`.
 
 **SFARI substitution note.** SFARI Gene was unreachable from the build
 environment (`gene-archive.sfari.org` blocked), so the neurodevelopmental gene
-set is **DDG2P only** — the shipped 363 candidates reflect that. The pipeline
+set is **DDG2P only**: the shipped 363 candidates reflect that. The pipeline
 unions any SFARI symbols supplied via `--sfari`, so a SFARI export can be
 dropped in without code changes (this will change the candidate count and
 ranking).
@@ -298,7 +336,7 @@ of 1e-4; a binding site present in one allele but not the other counts as a
 gain or loss, and `motif_disruption` = gains + losses drives the axis
 (min-max scaled). The recurrently gained/lost factors across candidates are
 neurodevelopmental regulators (MEIS1/2, PBX3, PKNOX1, DLX1, POU/SOX2, MEF2A).
-This is a candidate-level, presence/absence call, not an affinity model — see
+This is a candidate-level, presence/absence call, not an affinity model; see
 caveat 4.
 
 ---
@@ -320,11 +358,23 @@ har_annotator/
 run_pipeline.py  end-to-end driver (parameterized)
 ```
 
-Outputs: `funnel_counts.csv`, `candidate_hars.parquet`, `har_evidence.parquet`
-(+ `har_evidence_schema.json`), `har_shortlist_ranked.csv`/`.parquet`,
-`har_shortlist_top50.csv`. Interpretation: `top_candidates_interpretation.md`.
-Figures: `fig_funnel.png`, `fig_score_overview.png`,
-`fig_top_candidate_detail.png`.
+Outputs, by phase:
+
+| Phase | Output artifact(s) | What it is |
+|-------|--------------------|------------|
+| 1: funnel | `funnel_counts.csv`, `candidate_hars.parquet` | the 3,257→363 attrition and the surviving candidates |
+| 2: evidence | `har_evidence.parquet` (+ `har_evidence_schema.json`) | per-element evidence table (363 × 40), no score |
+| 3: score | `har_shortlist_ranked.csv`/`.parquet`, `har_shortlist_top50.csv` | the same rows plus every axis score, contribution, and `total_score`, ranked |
+| 4: interpret | `top_candidates_interpretation.md` | per-HAR biology for the top candidates, in tiers, with caveats |
+| 5: figures | see below | six figures |
+
+Figures (Phase 5): `fig_funnel.png` (candidate attrition),
+`fig_score_overview.png` (per-axis score contributions + score distribution),
+`fig_top_candidate_detail.png` (top HAR at its locus),
+`fig_acceleration_dist.png` (real human–chimp substitution rates; width proxy
+vs real divergence), `fig_motif_disruption.png` (JASPAR motif gains/losses +
+most recurrently disrupted TFs), `fig_rank_shift.png` (ranking impact of the
+real acceleration + motif axes, ρ = 0.976).
 
 ---
 
@@ -340,25 +390,25 @@ Zoonomia Cactus 241-mammal alignment (Christmas et al. 2023). We take the
 **mean phyloP over each HAR's span** as its constraint value and keep HARs with
 mean > 1.0 (Step A: 3,257 → 2,757).
 
-Why constraint matters for a *human-accelerated* region — the apparent paradox
+Why constraint matters for a *human-accelerated* region: the apparent paradox
 is the point. A HAR is a locus that was **deeply conserved across mammals**
 (high ancestral constraint) yet **changed rapidly on the human branch**. The
 mammalian-constraint filter enriches for elements that were doing something
 selectively important for a long time; the human-specific change is then more
 likely to be functionally consequential than a change in a locus that was
 never constrained. Constraint (mammalian, phyloP) and acceleration
-(human-branch) are **different axes** — this pipeline scores constraint
+(human-branch) are **different axes**: this pipeline scores constraint
 directly (mammalian phyloP) and acceleration directly from the human–chimp
 substitution rate, with the caveat that the latter is not lineage-polarized.
 
-**"Sharpened disease mapping" — what's actually established vs. what we
+**"Sharpened disease mapping": what's actually established vs. what we
 verified here.** The strong, external result is that base-pair mammalian
 constraint from Zoonomia enriches for trait/disease heritability and improves
-prioritization of causal variants — shown genome-wide in Sullivan et al. (2023,
+prioritization of causal variants, shown genome-wide in Sullivan et al. (2023,
 *Science*, doi:10.1126/science.abn2937), not something this pipeline proves. To
 avoid overclaiming, the enrichment was checked **inside this dataset**: of all
 3,257 HARs, constrained ones (phyloP > 1) overlap a neuropsychiatric GWAS locus
-(±25 kb) at **21.0%** vs **15.4%** for unconstrained — a **1.37× enrichment**
+(±25 kb) at **21.0%** vs **15.4%** for unconstrained, a **1.37× enrichment**
 (Fisher odds 1.46, p = 3.6×10⁻³). So constraint does concentrate disease
 overlap in our HAR set, but **modestly**; it is a sensible prioritization axis,
 not a strong causal sieve on its own. The pipeline's power comes from
@@ -372,7 +422,7 @@ Read `top_candidates_interpretation.md` for the top-candidate biology. Three
 caveats apply throughout and are load-bearing:
 
 1. **Overlap ≠ causation.** "Overlaps a GWAS locus" means within 25 kb of a
-   lead SNP — not that the HAR is the causal element or that its
+   lead SNP, not that the HAR is the causal element or that its
    human-specific changes drive the association.
 2. **Nearest gene ≠ target gene.** `nearest_tss` assignments are a proximity
    heuristic; `plac_linked` assignments rest on a neuronal PLAC-seq interaction (stronger,
@@ -383,7 +433,7 @@ caveats apply throughout and are load-bearing:
    and the substitution rate (subs / aligned bp) drives the axis. This replaces
    the former HAR-width proxy. The remaining caveat: human–chimp divergence
    does not by itself prove the change occurred on the *human* branch rather
-   than the chimp branch — strict human-specific acceleration needs an outgroup
+   than the chimp branch; strict human-specific acceleration needs an outgroup
    (e.g. macaque) or a branch model. It is a large improvement over width but a
    first-order measure; the axis weight (0.07) reflects that.
 4. **Motif disruption is a model-based call.** The motif axis counts JASPAR
@@ -398,13 +448,13 @@ regulatory neighbourhood of a gene whose disruption causes a developmental
 disorder *and* whose common variants associate with a psychiatric/cognitive
 trait, the same regulatory tuning that may have been advantageous for human
 brain evolution can raise disease liability under a different genetic
-background — a hypothesis-generating pattern, not a mechanistic claim.
+background, a hypothesis-generating pattern, not a mechanistic claim.
 
 ---
 
 ## License
 
-MIT — see `LICENSE`.
+MIT. See `LICENSE`.
 
 ## Citation of primary HAR source
 
