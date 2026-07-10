@@ -194,6 +194,31 @@ ranking is highly stable (Spearman ρ = 0.976 vs the proxy ranking), with the
 top of the list reordering as genuinely high-divergence HARs surface (new #1
 ZSWIM6/HAR_2378). To reproduce the pre-upgrade axes, run with `--no-seq-axes`.
 
+### Are the weights arbitrary? (weight sensitivity)
+
+The seven weights are **transparent expert priors, not parameters fitted to
+ground truth** — no validated-HAR training set exists to fit them to. So the
+honest question isn't *"are these the right weights?"* but *"do the conclusions
+survive reasonable changes to them?"* Because every candidate's seven per-axis
+sub-scores are stored in the shortlist, the whole ranking can be recomputed under
+any weight vector without re-running the pipeline — so this is directly testable.
+
+Perturbing all seven weights across 20,000 random weightings (Dirichlet around
+the default):
+
+- **The ranking as a whole is robust** — median Spearman **ρ = 0.97** vs the
+  default (equal weights, 1/7 each, still gives ρ = 0.95). *The shortlist is a
+  property of the evidence, not of the weight choices.*
+- **The exact #1 is a defensible ~3-way race** — ZSWIM6 (~47%), POC1B (~29%),
+  TCF20 (~21%), all neurodevelopmental genes. The tool hands you a small,
+  coherent cluster of top candidates rather than false certainty about one.
+- **No single axis is load-bearing** — dropping any one axis keeps ρ ≥ 0.90
+  (except `gene`, which by design changes the question being asked).
+
+Reproduce it yourself: the [`weight_eval/`](weight_eval/) folder ships a
+standalone script (`python weight_eval/evaluate_weights.py`) that runs all four
+tests and regenerates the summary figure.
+
 ---
 
 ## Install & run
