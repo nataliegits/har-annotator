@@ -1,5 +1,9 @@
 # HAR annotator
 
+![CI](https://github.com/nataliegits/har-annotator/actions/workflows/ci.yml/badge.svg)
+![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)
+![Python 3.11](https://img.shields.io/badge/python-3.11-blue.svg)
+
 **Human Accelerated Regions (HARs)** are stretches of the genome that stayed
 frozen across mammalian evolution and then changed sharply on the human branch,
 which makes them prime suspects for what rewired the human brain. There are
@@ -21,6 +25,13 @@ Everything is hg38. Every data pull is cached, hashed, and logged to
 ```
 python run_pipeline.py            # reproduces the shipped shortlist exactly
 ```
+
+> **Looking for v2?** This README documents **v1**, the disease-anchored
+> pipeline. The [`v2/`](v2/) folder holds the **discovery-mode** build-out —
+> same pipeline with the disease-gene gate removed — plus a neglect-aware
+> ranking and a wet-lab validation plan. Start at [`v2/README_v2.md`](v2/README_v2.md),
+> or jump to [the v2 section below](#v2--discovery-mode-and-beyond). v1 is
+> unchanged; v2 is purely additive.
 
 ---
 
@@ -220,6 +231,57 @@ Key parameters (all have defaults that reproduce the shipped shortlist):
 
 GWAS-window sensitivity (candidate count): 10 kb → 196, **25 kb → 363**,
 50 kb → 526, 100 kb → 759. 25 kb (LD-block scale) is the shipped default.
+
+---
+
+## v2 — discovery mode (and beyond)
+
+Everything above describes **v1**: the funnel *requires* each HAR to sit near a
+known neurodevelopmental **disease** gene, so every hit has a disease name
+attached by construction. That is deliberately conservative — and it means the
+truly novel elements (accelerated, brain-active, but near a gene nobody has
+linked to disease yet) are filtered out before they are ever scored.
+
+The [`v2/`](v2/) folder relaxes that. It keeps v1 completely intact and adds
+three things on top:
+
+- **Discovery mode (v2.0).** Drop the disease-gene gate; require proximity to
+  *any* gene instead. Same constraint gate, same GWAS overlap, same seven scoring
+  axes. The result is a **strict superset**: the shipped **363** disease-anchored
+  elements keep their exact ranking (Spearman ρ = 0.9998, ZSWIM6 still #1), and
+  **214 new elements surface** — 577 total — every one near a gene *not* in the
+  disease panel. The new hits read like a who's-who of cortical development the
+  disease panel hasn't caught up to: *DAB1* (reelin / cortical layering), *NPAS3*
+  (schizophrenia), *TLE4*, *PTPRD*, *CDH8*, *EFNA5*, *TSHZ2/3*.
+- **Neglect-aware ranking (v1.1).** An optional axis that rewards *understudied*
+  target genes (`1 − minmax(log10(PubMed + 1))`), folded in so the weights still
+  sum to 1.0. It turns "find me something new" into an explicit knob.
+- **A wet-lab validation ladder.** MPRA → Capture-C + CRISPRi → humanized
+  cortical organoids — the arc from an in-silico hypothesis to a mechanistic
+  claim.
+
+### What's in `v2/`
+
+| File | What it is |
+|------|-----------|
+| [`v2/README_v2.md`](v2/README_v2.md) | v2 README — discovery mode, no disease requirement |
+| `v2/demo_live_v2.py` | live demo, superset of v1's `demo_live.py` (adds `--discovery`, `--neglect W`) |
+| `v2/har_shortlist_discovery.parquet` / `.csv` | the full 577-element discovery shortlist |
+| `v2/discovery_new_elements.csv` | the 214 newly-surfaced elements on their own |
+| `v2/har_shortlist_neglect.parquet` / `.csv` | the neglect-aware re-ranking |
+| `v2/validation_ladder.md` | the 4-tier wet-lab validation plan |
+| `v2/figures/` | discovery-vs-anchored, neglect-reshuffle, and validation-ladder figures |
+
+```bash
+python v2/demo_live_v2.py --discovery      # the 577-element discovery shortlist, live
+python v2/demo_live_v2.py --neglect 0.25   # reward understudied target genes
+```
+
+**When to use which.** Use **v1** when you want conservative, disease-grounded
+candidates. Use **v2 discovery** when you want reach into un-annotated biology —
+accepting that the 214 new elements have no disease prior and are best read as
+leads for follow-up. See [`v2/README_v2.md`](v2/README_v2.md) for the full v2
+write-up and caveats.
 
 ---
 
