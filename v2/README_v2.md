@@ -5,7 +5,7 @@
 ![Python 3.11](https://img.shields.io/badge/python-3.11-blue.svg)
 
 > **This is the v2 companion to the shipped pipeline.** The main
-> [`README.md`](README.md) documents **v1**, the disease-anchored pipeline that
+> [`README.md`](../README.md) documents **v1**, the disease-anchored pipeline that
 > requires each HAR to sit near a known neurodevelopmental *disease* gene. **v2
 > drops that requirement.** Everything else — the constraint gate, the GWAS
 > overlap, the seven scoring axes, the code — is identical. v1 is kept intact for
@@ -136,7 +136,7 @@ why the disease-anchored 363 keep almost exactly their v1 order (Spearman
 ρ = 0.9998, ZSWIM6 still #1) and the 214 new elements slot in below them.
 
 For the full axis-by-axis math, weighting rationale, and caveats, see the main
-[`README.md`](README.md) — every axis is defined identically there.
+[`README.md`](../README.md) — every axis is defined identically there.
 
 ---
 
@@ -158,6 +158,46 @@ python demo_live_v2.py --discovery --no-color   # strip ANSI for logs / projecto
 the three v1 moves (`default`, `--gene`, `--weight`) and adds `--discovery` (this
 mode) and `--neglect W` (reward understudied target genes). v1's `demo_live.py`
 is unchanged and remains the disease-anchored demo.
+
+---
+
+## Change the weights (the discovery shortlist re-ranks too)
+
+v2 changes **which HARs enter** the shortlist (it drops the disease-gene gate);
+it does **not** change how they are scored. The seven-axis weighted sum is
+byte-identical to v1, and the shipped `har_shortlist_discovery.parquet` keeps
+all seven `score_<axis>` columns — so you can re-rank the 577-element discovery
+set under any weights, exactly the way v1's
+[**Change the weights yourself**](README.md#change-the-weights-yourself)
+section describes for the anchored 363.
+
+The re-ranking is a plain weighted sum over columns that already exist, so it's
+a few lines — no re-run, no network:
+
+```python
+import pandas as pd
+from har_annotator.score import COMPONENTS   # the 7 axis names
+
+df = pd.read_parquet("har_shortlist_discovery.parquet")
+w  = {"constraint": .18, "gene": .10, "disease": .10,
+      "brain": .13, "temporal": .13, "acceleration": .06, "motif": .30}  # your call
+df["total_score"] = sum(w[c] * df[f"score_{c}"] for c in COMPONENTS)
+df = df.sort_values("total_score", ascending=False).reset_index(drop=True)
+df.to_csv("discovery_motif_weighted.csv", index=False)
+```
+
+Two things worth knowing, both the same as v1:
+
+- **The `--weights` CLI flag lives on the *anchored* pipeline** (`python
+  run_pipeline.py --weights motif=0.30`). It re-scores the disease-anchored 363.
+  The discovery shortlist is a precomputed product; re-rank it with the snippet
+  above (or edit the `WEIGHTS` dict in
+  [`har_annotator/score.py`](har_annotator/score.py) and rebuild).
+- **In the live demo the two moves are separate commands, not one.**
+  `demo_live_v2.py --discovery` shows the discovery list; `demo_live_v2.py
+  --weight motif=0.30` re-ranks the anchored 363 live. Discovery selects the
+  candidate pool; `--weight`/the snippet sets how any pool is ranked — the two
+  ideas are independent, they're just invoked separately in the shipped CLI.
 
 ---
 

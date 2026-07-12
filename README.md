@@ -103,8 +103,8 @@ in the mid-fetal convergence window (~10–24 post-conception weeks, BrainSpan),
 the developmental moment where human-specific regulation and neuropsychiatric
 risk are thought to coincide. Of the 363 candidates, 347 target genes could be
 timed and 129 peak inside the mid-fetal window.
-<img width="1801" height="1231" alt="fig_shortlist_preview" src="https://github.com/user-attachments/assets/f8a7ed8b-1cac-4083-9a8e-609b3068609e" />
 
+![HAR-annotator shortlist — top 15 of 363, each rank broken into its seven weighted axis contributions. The bar length is the total score; the colored segments show exactly what earns each element its rank.]({{artifact:art_a28ed986-1b83-45bd-beed-b14385034f5b}})
 
 *Because the score is a transparent weighted sum, every rank decomposes into its
 seven axes — you can see precisely what earns each element its place (ZSWIM6's
@@ -272,6 +272,61 @@ Key parameters (all have defaults that reproduce the shipped shortlist):
 
 GWAS-window sensitivity (candidate count): 10 kb → 196, **25 kb → 363**,
 50 kb → 526, 100 kb → 759. 25 kb (LD-block scale) is the shipped default.
+
+---
+
+## Change the weights yourself
+
+The score is a plain weighted sum, so re-prioritizing the shortlist is a
+one-liner — no retraining, no code edit required. There are two ways in,
+depending on whether you want a one-off run or a new default.
+
+**1. Per run, from the command line (no code edit).** Pass `--weights` as a
+comma-separated `axis=value` list. Any axis you name is overridden; every axis
+you *don't* name keeps its default:
+
+```bash
+# reward TF-motif disruption instead of gene/disease proximity
+python run_pipeline.py --weights motif=0.30 --outdir out_motif/
+
+# a "development-first" lens: push the where/when axes
+python run_pipeline.py --weights brain=0.25,temporal=0.25 --outdir out_dev/
+
+# reproduce the pre-temporal v1 ranking (turn one axis off entirely)
+python run_pipeline.py --weights temporal=0 --outdir out_v1spine/
+```
+
+The seven axis names are exactly: `constraint`, `gene`, `disease`, `brain`,
+`temporal`, `acceleration`, `motif`. Each run writes its own full ranked table
+to `--outdir`, so you can diff two weightings and see exactly which HARs moved.
+
+**2. As a new default, in code.** Edit the `WEIGHTS` dict at the top of
+[`har_annotator/score.py`](har_annotator/score.py):
+
+```python
+WEIGHTS = {
+    "constraint": 0.18, "gene": 0.22, "disease": 0.22,
+    "brain": 0.13, "temporal": 0.13, "acceleration": 0.07, "motif": 0.05,
+}
+```
+
+Change the numbers, re-run `python run_pipeline.py`, and every downstream
+output (shortlist, evidence table, figures) picks up the new default.
+
+**One thing to know about the math.** Overrides *merge onto* the defaults —
+`w = {**WEIGHTS, **your_overrides}` — they are **not** renormalized to sum to
+1.0. So `--weights motif=0.30` leaves the other six axes at their defaults and
+the totals no longer sum to 1. That does **not** distort the ranking (it's a
+monotonic rescale — every HAR is scored on the same weights), but if you want
+the `total_score` to stay a clean 0–1 number, pass a full set that sums to 1.0.
+The demo's "push one axis to 0.30 and shrink the rest proportionally" behavior
+(see `fig_weight_knobs.png`) is exactly that renormalized version.
+
+**How much do the weights actually matter?** See
+[*Are the weights arbitrary?*](#are-the-weights-arbitrary-weight-sensitivity)
+below: across 20,000 random weightings the shortlist is stable (ρ ≈ 0.95 even
+at equal 1/7 weights), so the weights are a steering interface, not a lever for
+manufacturing a result.
 
 ---
 
