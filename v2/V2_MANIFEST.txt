@@ -16,8 +16,19 @@ v1.1 = neglect-aware ranking: optional axis that rewards understudied
 CONTENTS
 --------
 README_v2.md                       v2 README (all three relaxation levels)
+rank.py                            THE CLONE WORKFLOW: choose a funnel
+                                   (--funnel anchored|discovery|relaxed), set
+                                   weights (--weights motif=0.30 ...), rank.
+                                   Reads the candidates_* tables (below).
 demo_live_v2.py                    live demo, superset of v1's demo_live.py
                                    (adds --discovery and --neglect W)
+
+candidates_anchored.parquet/.csv   363 elements, RAW per-axis evidence only
+candidates_discovery.parquet/.csv  577 elements, RAW per-axis evidence only
+candidates_relaxed.parquet/.csv    2,757 elements, RAW per-axis evidence only
+                                   (5 axes; no acceleration/motif)
+                                   NO total_score, NO ranking in these files —
+                                   rank.py computes the ranking from YOUR weights.
 
 har_shortlist_discovery.parquet    577-element discovery shortlist (full)
 har_shortlist_discovery.csv          "        "         "        (CSV)

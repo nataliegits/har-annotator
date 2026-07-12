@@ -25,7 +25,11 @@ annotation** at all.
 Everything is hg38. Every data pull is cached, hashed, and logged to
 `data/manifest.csv`, so the analysis replays end-to-end from source.
 
-```
+```bash
+# the clone workflow: choose a funnel, set your weights, rank
+python rank.py --funnel discovery --weights motif=0.30
+
+# or the guided live tour
 python demo_live_v2.py --discovery      # the v2 shortlist, live in <1 second
 ```
 
@@ -63,38 +67,63 @@ elements + **214 newly surfaced** elements, every one of them near a gene that i
 
 ---
 
-## The three relaxation levels
+## Clone → choose a funnel → set your weights
 
-The pipeline exposes three nested candidate sets, each answering a different
-question. All three are precomputed tables you can load and re-rank; only the
-first two have a live demo mode.
+**If you clone this repo, this is the whole workflow.** Two decisions, in order,
+and you make both:
 
-| Level | n | Command / file | The question it answers |
-|-------|--:|----------------|-------------------------|
-| **Disease-anchored** (v1) | 363 | `python run_pipeline.py` → `har_shortlist_ranked.parquet` | Which HARs sit near a gene we *already know* causes a brain disorder? |
-| **Discovery** (v2) | 577 | `python demo_live_v2.py --discovery` → `har_shortlist_discovery.parquet` | Which constrained, GWAS-overlapping HARs sit near *any* gene, disease-annotated or not? |
-| **Constraint-only** | 2,757 | `har_shortlist_relaxed.parquet` *(precomputed table — no demo flag)* | Which HARs are simply under strong mammalian constraint, before any disease/GWAS filter? |
+**Step 1 — choose the funnel** (which HARs are even in the running). It's a
+ternary choice; each level removes one gate, and they nest exactly
+(363 ⊂ 577 ⊂ 2,757):
 
-The constraint-only table is scored on five axes (see the caveat above) and is
-best used as a wide net for exploration. Re-rank it the same way as the discovery
-set — a plain weighted sum over columns that already exist:
+| Funnel | n | `--funnel` | Candidate table | The question it answers |
+|--------|--:|-----------|-----------------|-------------------------|
+| **Disease-anchored** | 363 | `anchored` | `candidates_anchored.parquet` | Which HARs sit near a gene we *already know* causes a brain disorder? |
+| **Discovery** | 577 | `discovery` | `candidates_discovery.parquet` | Which constrained, GWAS-overlapping HARs sit near *any* gene? |
+| **Constraint-only** | 2,757 | `relaxed` | `candidates_relaxed.parquet` | Which HARs are simply under strong mammalian constraint? |
 
-```python
-import pandas as pd
+**Step 2 — set the weights** (what the score rewards). Then rank:
 
-df = pd.read_parquet("har_shortlist_relaxed.parquet")
-# constraint-only ships 5 axes; weights renormalized to sum to 1
-w = {"constraint": .205, "gene": .25, "disease": .25, "brain": .148, "temporal": .148}
-df["total_score"] = sum(w[c] * df[f"score_{c}"] for c in w)
-df = df.sort_values("total_score", ascending=False).reset_index(drop=True)
-print(df.head(15)[["gene", "har_id", "total_score"]])
+```bash
+python rank.py --funnel discovery                              # balanced defaults
+python rank.py --funnel discovery --weights motif=0.30 gene=0.10 disease=0.10
+python rank.py --funnel relaxed  --weights constraint=0.40     # 5-axis funnel
+python rank.py --funnel anchored --top 20 --out my_ranking.csv
 ```
 
-Relaxing to constraint-only reshuffles the leaderboard substantially: *TCF20*
-rises to #1 and seven elements that the GWAS gate had excluded — *SMARCA2,
-ITPR1, VLDLR, HOXC13, TRAPPC4, ORC4*, and a second *ZNF462* element — enter the
-top 15. That is the point of the level: it shows what the disease/GWAS gates were
-filtering out.
+**No scores are shipped.** The three `candidates_*` tables contain *only* the raw
+per-axis evidence — `score_<axis>`, each normalized 0–1 — sorted by `har_id`.
+There is **no `total_score` column and no ranking in the files.** Nothing is
+ranked until *you* supply weights: `rank.py` computes the weighted sum on demand,
+renormalizes your weights to sum to 1, prints the effective weights every run,
+and (with `--out`) writes the full ranked table. The ranking is yours, not a
+number we baked in.
+
+The anchored and discovery funnels carry all **seven** axes (gene, disease,
+constraint, brain, temporal, acceleration, motif). The constraint-only funnel
+carries **five** — acceleration and motif need human–chimp alignments that were
+only computed for the constrained-and-GWAS sets, so they don't exist there.
+`rank.py` reads whichever axes the table has and ignores (with a printed note)
+any weight you set for an axis that funnel doesn't have.
+
+> **Prefer a two-line snippet to a CLI?** It's a plain weighted sum over columns
+> that already exist:
+> ```python
+> import pandas as pd
+> df = pd.read_parquet("candidates_relaxed.parquet")
+> w  = {"constraint": .205, "gene": .25, "disease": .25, "brain": .148, "temporal": .148}
+> w  = {k: v / sum(w.values()) for k, v in w.items()}     # renormalize to 1
+> df["total_score"] = sum(w[c] * df[f"score_{c}"] for c in w)
+> df = df.sort_values("total_score", ascending=False).reset_index(drop=True)
+> print(df.head(15)[["gene", "har_id", "total_score"]])
+> ```
+
+Funnel and weights are **independent choices**: the funnel sets the candidate
+pool, the weights set how that pool is ranked. Relaxing to constraint-only
+reshuffles the leaderboard substantially — *TCF20* rises to #1 and seven elements
+the GWAS gate had excluded (*SMARCA2, ITPR1, VLDLR, HOXC13, TRAPPC4, ORC4*, and a
+second *ZNF462* element) enter the top 15 — which is exactly what the level is
+for: it shows what the disease and GWAS gates were filtering out.
 
 ---
 
@@ -199,9 +228,10 @@ python demo_live_v2.py --discovery     # v2: the 577-element discovery shortlist
 python demo_live_v2.py --discovery --no-color   # strip ANSI for logs / projectors
 ```
 
-The widest, constraint-only level (2,757 elements, GWAS gate dropped) is shipped
-as a precomputed table rather than a demo mode — see
-[**The three relaxation levels**](#the-three-relaxation-levels) below.
+To pick a funnel and rank it under your own weights — the main way to use a
+clone of this repo — see [**Clone → choose a funnel → set your
+weights**](#clone--choose-a-funnel--set-your-weights) above. The `demo_live_v2.py`
+modes below are the quick guided tour; `rank.py` is the general tool.
 
 `demo_live_v2.py` is a strict superset of the shipped `demo_live.py`: it keeps
 the three v1 moves (`default`, `--gene`, `--weight`) and adds `--discovery` (this
@@ -210,43 +240,35 @@ is unchanged and remains the disease-anchored demo.
 
 ---
 
-## Change the weights (the discovery shortlist re-ranks too)
+## Two file sets, and the older CLI entry points
 
-v2 changes **which HARs enter** the shortlist (it drops the disease-gene gate);
-it does **not** change how they are scored. The seven-axis weighted sum is
-byte-identical to v1, and the shipped `har_shortlist_discovery.parquet` keeps
-all seven `score_<axis>` columns — so you can re-rank the 577-element discovery
-set under any weights, exactly the way v1's
-[**Change the weights yourself**](README.md#change-the-weights-yourself)
-section describes for the anchored 363.
+There are two parallel sets of tables in this folder, for two different needs:
 
-The re-ranking is a plain weighted sum over columns that already exist, so it's
-a few lines — no re-run, no network:
+- **`candidates_*.parquet` — raw evidence, no scores.** The recommended clone
+  workflow above. You choose the weights; `rank.py` ranks on demand. Use these
+  when you want the ranking to be *yours*.
+- **`har_shortlist_*.parquet` — pre-scored under the default balanced weights**
+  (`har_shortlist_discovery.parquet` = 577, `har_shortlist_relaxed.parquet` =
+  2,757; the anchored 363 is v1's `har_shortlist_ranked.parquet`). These keep the
+  `total_score`, `rank`, and `contrib_<axis>` columns so you can see the default
+  ranking and the per-axis contribution breakdown without running anything. Use
+  these when you want the reference result the paper/figures were built from.
 
-```python
-import pandas as pd
-from har_annotator.score import COMPONENTS   # the 7 axis names
+Both are the same underlying evidence — the `har_shortlist_*` files simply have
+one particular weighting already applied. If you only ever want to set your own
+weights, ignore them and work from `candidates_*` + `rank.py`.
 
-df = pd.read_parquet("har_shortlist_discovery.parquet")
-w  = {"constraint": .18, "gene": .10, "disease": .10,
-      "brain": .13, "temporal": .13, "acceleration": .06, "motif": .30}  # your call
-df["total_score"] = sum(w[c] * df[f"score_{c}"] for c in COMPONENTS)
-df = df.sort_values("total_score", ascending=False).reset_index(drop=True)
-df.to_csv("discovery_motif_weighted.csv", index=False)
-```
-
-Two things worth knowing, both the same as v1:
+Two things worth knowing about the older CLI entry points, both unchanged from v1:
 
 - **The `--weights` CLI flag lives on the *anchored* pipeline** (`python
-  run_pipeline.py --weights motif=0.30`). It re-scores the disease-anchored 363.
-  The discovery shortlist is a precomputed product; re-rank it with the snippet
-  above (or edit the `WEIGHTS` dict in
-  [`har_annotator/score.py`](har_annotator/score.py) and rebuild).
-- **In the live demo the two moves are separate commands, not one.**
+  run_pipeline.py --weights motif=0.30`). It re-scores the disease-anchored 363
+  from source. For the discovery and constraint-only funnels, use `rank.py`
+  (above) or edit the `WEIGHTS` dict in
+  [`har_annotator/score.py`](har_annotator/score.py) and rebuild.
+- **In the live demo, funnel and weights are separate commands, not one.**
   `demo_live_v2.py --discovery` shows the discovery list; `demo_live_v2.py
-  --weight motif=0.30` re-ranks the anchored 363 live. Discovery selects the
-  candidate pool; `--weight`/the snippet sets how any pool is ranked — the two
-  ideas are independent, they're just invoked separately in the shipped CLI.
+  --weight motif=0.30` re-ranks the anchored 363 live. `rank.py` is the tool that
+  combines both choices in a single call.
 
 ---
 
