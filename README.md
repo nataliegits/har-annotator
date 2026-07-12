@@ -104,7 +104,8 @@ the developmental moment where human-specific regulation and neuropsychiatric
 risk are thought to coincide. Of the 363 candidates, 347 target genes could be
 timed and 129 peak inside the mid-fetal window.
 
-![HAR-annotator shortlist — top 15 of 363, each rank broken into its seven weighted axis contributions. The bar length is the total score; the colored segments show exactly what earns each element its rank.]({{artifact:art_a28ed986-1b83-45bd-beed-b14385034f5b}})
+<img width="1801" height="1231" alt="fig_shortlist_preview" src="https://github.com/user-attachments/assets/2952780d-b462-48aa-9fcb-8cf28237c018" />
+
 
 *Because the score is a transparent weighted sum, every rank decomposes into its
 seven axes — you can see precisely what earns each element its place (ZSWIM6's
