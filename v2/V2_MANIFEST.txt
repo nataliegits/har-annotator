@@ -2,24 +2,35 @@ HAR-annotator v2.0 bundle
 =========================
 Drop-in additions for github.com/nataliegits/har-annotator. Nothing here
 overwrites v1 — the v2 files are named distinctly (README_v2.md,
-demo_live_v2.py, discovery/neglect shortlists) so the disease-anchored v1
-pipeline stays intact for reference.
+demo_live_v2.py, discovery/relaxed/neglect shortlists) so the disease-anchored
+v1 pipeline stays intact for reference.
 
-v2.0 = discovery mode: same pipeline, disease-gene gate dropped.
-       363 disease-anchored -> 577 (363 shared + 214 newly surfaced near
-       non-disease genes). Strict superset of v1.
+THREE NESTED RELAXATION LEVELS (each removes one gate; 363 ⊂ 577 ⊂ 2,757):
+  v1  disease-anchored   363   constraint + GWAS + near a DDG2P disease gene
+  v2  discovery          577   constraint + GWAS + near ANY gene (disease gate dropped)
+      constraint-only  2,757   constraint only (GWAS gate also dropped; 5-axis score)
+
 v1.1 = neglect-aware ranking: optional axis that rewards understudied
        target genes (bundled here as it shipped alongside v2).
 
 CONTENTS
 --------
-README_v2.md                       v2 README (discovery mode, no disease requirement)
+README_v2.md                       v2 README (all three relaxation levels)
 demo_live_v2.py                    live demo, superset of v1's demo_live.py
                                    (adds --discovery and --neglect W)
 
 har_shortlist_discovery.parquet    577-element discovery shortlist (full)
 har_shortlist_discovery.csv          "        "         "        (CSV)
 discovery_new_elements.csv         the 214 newly-surfaced elements only
+
+har_shortlist_relaxed.parquet      2,757-element constraint-only shortlist
+har_shortlist_relaxed.csv            "        "         "        (CSV)
+                                   NOTE: scored on 5 axes (constraint, gene,
+                                   disease, brain, temporal); acceleration and
+                                   motif omitted (no alignments beyond the
+                                   discovery set). Weights renormalized:
+                                   gene .25 disease .25 constraint .205
+                                   brain .148 temporal .148.
 
 har_shortlist_neglect.parquet      neglect-aware re-ranking (v1.1)
 har_shortlist_neglect.csv            "        "        "     (CSV)
@@ -28,6 +39,7 @@ validation_ladder.md               wet-lab validation path (MPRA -> Capture-C
                                    + CRISPRi -> humanized organoids)
 
 figures/fig_discovery_vs_anchored.png   funnel + score dists + top-14 new genes
+figures/fig_top15_three_funnels.png     top-15 at each of the 3 relaxation levels
 figures/fig_neglect_rerank.png          rank reshuffle under neglect weighting
 figures/fig_validation_ladder.png       the 4-tier validation schematic
 
@@ -39,4 +51,6 @@ HOW TO RUN
 conda activate hars
 python demo_live_v2.py --discovery        # the 577-element shortlist, live
 python demo_live_v2.py --neglect 0.25     # neglect-aware re-ranking
+# constraint-only (2,757): load har_shortlist_relaxed.parquet and re-rank
+#   (precomputed table, no demo flag — see README_v2 "three relaxation levels")
 (v1 unchanged: python demo_live.py / python run_pipeline.py)

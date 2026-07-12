@@ -33,23 +33,68 @@ python demo_live_v2.py --discovery      # the v2 shortlist, live in <1 second
 
 ## What changes from v1 (and what does not)
 
-| Funnel step | v1 (disease-anchored) | v2 (discovery) |
-|-------------|-----------------------|----------------|
-| 0 — All HARs (Cui et al. 2025, hg38) | 3,257 | 3,257 |
-| A — Mammalian constraint (mean 241-way phyloP > 1.0) | 2,757 | 2,757 |
-| B — Gene proximity (within 1 Mb of a TSS) | near a **disease** gene → 1,718 | near **any** gene → 2,739 |
-| C — Within 25 kb of a neuropsychiatric GWAS lead SNP | **363** | **577** |
+| Funnel step | Constraint-only | v2 (discovery) | v1 (disease-anchored) |
+|-------------|-----------------|----------------|-----------------------|
+| 0 — All HARs (Cui et al. 2025, hg38) | 3,257 | 3,257 | 3,257 |
+| A — Mammalian constraint (mean 241-way phyloP > 1.0) | **2,757** | 2,757 | 2,757 |
+| B — Gene proximity (within 1 Mb of a TSS) | *not applied* | near **any** gene → 2,739 | near a **disease** gene → 1,718 |
+| C — Within 25 kb of a neuropsychiatric GWAS lead SNP | *not applied* | **577** | **363** |
 
-**Only step B changes.** v1 requires the nearby gene to be in DDG2P (the
-Developmental Disorders gene panel); v2 requires only that *some* gene is within
-reach. The constraint gate (A) and the GWAS-overlap gate (C) are untouched, so a
-v2 candidate is still evolutionarily constrained *and* still overlaps a real
-brain-trait genetic signal — it has simply not been pre-filtered to genes we
-already flag for disease.
+**Each level removes one gate.** Read the table right-to-left: v1 (disease-anchored,
+**363**) is the strictest — constraint *and* GWAS overlap *and* a nearby DDG2P
+disease gene. v2 (discovery, **577**) drops only the disease-gene requirement in
+step B, keeping constraint and GWAS. **Constraint-only (2,757)** goes one gate
+further and drops the GWAS overlap too, keeping only the evolutionary-constraint
+filter — it is every HAR that passes step A, scored and ranked. The three sets
+nest exactly: **363 ⊂ 577 ⊂ 2,757**.
+
+**One caveat on the constraint-only level.** Because the acceleration and motif
+axes need human–chimp alignments that were only fetched for the anchored/discovery
+sets, the 2,757-element constraint-only shortlist is scored on **five axes**
+(constraint, gene, disease, brain, temporal) with the two missing weights
+redistributed proportionally (gene 0.25, disease 0.25, constraint 0.205, brain
+0.148, temporal 0.148). Its ranking is therefore not directly comparable
+element-for-element with the 7-axis anchored/discovery scores — treat it as a
+wider net, not a finer ruler.
 
 The result is a **strict superset**: 577 = the original **363** disease-anchored
 elements + **214 newly surfaced** elements, every one of them near a gene that is
 *not* in the disease panel.
+
+---
+
+## The three relaxation levels
+
+The pipeline exposes three nested candidate sets, each answering a different
+question. All three are precomputed tables you can load and re-rank; only the
+first two have a live demo mode.
+
+| Level | n | Command / file | The question it answers |
+|-------|--:|----------------|-------------------------|
+| **Disease-anchored** (v1) | 363 | `python run_pipeline.py` → `har_shortlist_ranked.parquet` | Which HARs sit near a gene we *already know* causes a brain disorder? |
+| **Discovery** (v2) | 577 | `python demo_live_v2.py --discovery` → `har_shortlist_discovery.parquet` | Which constrained, GWAS-overlapping HARs sit near *any* gene, disease-annotated or not? |
+| **Constraint-only** | 2,757 | `har_shortlist_relaxed.parquet` *(precomputed table — no demo flag)* | Which HARs are simply under strong mammalian constraint, before any disease/GWAS filter? |
+
+The constraint-only table is scored on five axes (see the caveat above) and is
+best used as a wide net for exploration. Re-rank it the same way as the discovery
+set — a plain weighted sum over columns that already exist:
+
+```python
+import pandas as pd
+
+df = pd.read_parquet("har_shortlist_relaxed.parquet")
+# constraint-only ships 5 axes; weights renormalized to sum to 1
+w = {"constraint": .205, "gene": .25, "disease": .25, "brain": .148, "temporal": .148}
+df["total_score"] = sum(w[c] * df[f"score_{c}"] for c in w)
+df = df.sort_values("total_score", ascending=False).reset_index(drop=True)
+print(df.head(15)[["gene", "har_id", "total_score"]])
+```
+
+Relaxing to constraint-only reshuffles the leaderboard substantially: *TCF20*
+rises to #1 and seven elements that the GWAS gate had excluded — *SMARCA2,
+ITPR1, VLDLR, HOXC13, TRAPPC4, ORC4*, and a second *ZNF462* element — enter the
+top 15. That is the point of the level: it shows what the disease/GWAS gates were
+filtering out.
 
 ---
 
@@ -153,6 +198,10 @@ python run_pipeline.py                 # v1: reproduces the disease-anchored 363
 python demo_live_v2.py --discovery     # v2: the 577-element discovery shortlist
 python demo_live_v2.py --discovery --no-color   # strip ANSI for logs / projectors
 ```
+
+The widest, constraint-only level (2,757 elements, GWAS gate dropped) is shipped
+as a precomputed table rather than a demo mode — see
+[**The three relaxation levels**](#the-three-relaxation-levels) below.
 
 `demo_live_v2.py` is a strict superset of the shipped `demo_live.py`: it keeps
 the three v1 moves (`default`, `--gene`, `--weight`) and adds `--discovery` (this
