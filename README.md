@@ -104,8 +104,7 @@ the developmental moment where human-specific regulation and neuropsychiatric
 risk are thought to coincide. Of the 363 candidates, 347 target genes could be
 timed and 129 peak inside the mid-fetal window.
 
-<img width="1801" height="1231" alt="fig_shortlist_preview" src="https://github.com/user-attachments/assets/2952780d-b462-48aa-9fcb-8cf28237c018" />
-
+![HAR-annotator shortlist — top 15 of 363, each rank broken into its seven weighted axis contributions. The bar length is the total score; the colored segments show exactly what earns each element its rank.]({{artifact:art_a28ed986-1b83-45bd-beed-b14385034f5b}})
 
 *Because the score is a transparent weighted sum, every rank decomposes into its
 seven axes — you can see precisely what earns each element its place (ZSWIM6's
@@ -139,6 +138,35 @@ Weights sum to 1.0 and are module constants (`har_annotator/score.py`),
 overridable per run: `python run_pipeline.py --weights gene=0.35,disease=0.30`.
 `brain` (*where* a target gene is active) and `temporal` (*when* it is active)
 are the paired developmental-context axes.
+
+<a name="the-seven-formulas"></a>
+### The seven formulas at a glance
+
+Every axis maps its raw evidence onto **0–1 with one explicit transform** — no
+learned model, no hidden step. Here is the exact arithmetic for all seven, the
+whole scoring engine on one screen:
+
+| Axis | Weight | `score` (0–1) = | in words |
+|------|:-:|---|---|
+| **gene** | 0.22 | `confidence × (1 − dist/1 Mb) + 0.15·plac`, clip [0,1] | disease-gene tier (def 1.0 / strong 0.75 / mod 0.5 / lim 0.3), faded by TSS distance, +0.15 if physically contacted (PLAC-seq) |
+| **disease** | 0.22 | `min(−log₁₀ p, 50)/50 × (1 − dist/25 kb)` | GWAS significance × closeness to the lead SNP — needs **both** |
+| **constraint** | 0.18 | `minmax(phyloP_mean)` | how conserved, rescaled 0–1 across the candidate set |
+| **brain** *(where)* | 0.13 | `0.8·dnase_overlap + 0.2·plac_atac` | in fetal-brain open chromatin (+ neuronal ATAC support) |
+| **temporal** *(when)* | 0.13 | `gene_midfetal_frac`, clip [0,1] | fraction of the gene's prenatal expression inside 10–24 pcw |
+| **acceleration** | 0.07 | `minmax(subst_rate)` | human–chimp substitutions per aligned bp, rescaled 0–1 |
+| **motif** | 0.05 | `minmax(motif_disruption)` | # JASPAR TF sites gained/lost between the human and chimp alleles, rescaled 0–1 |
+
+```
+total_score = Σ  WEIGHTS[axis] · score_axis      # 7 terms, sums to a 0–1 number
+```
+
+Two design choices are visible right in the table: **`constraint`,
+`acceleration`, and `motif` are min-max scaled** (relative to the candidate set,
+so they answer "compared to the other candidates"), while **`gene`, `disease`,
+`brain`, and `temporal` use fixed absolute transforms** (they mean the same thing
+regardless of which HARs are in the funnel). Worked example — POC1B's gene axis:
+`1.0 × (1 − 0/1 Mb) + 0.15 = 0.974`. The per-axis prose below walks through each
+one; this table is the reference you can pull up in one glance.
 
 ### How we weighted the values and gave each a 0–1 score
 
