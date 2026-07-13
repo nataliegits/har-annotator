@@ -22,6 +22,14 @@ not a black-box answer.
 Everything is hg38. Every data pull is cached, hashed, and logged to
 `data/manifest.csv`, so the analysis replays end-to-end from source.
 
+> **Built with [Claude Science](https://www.anthropic.com).** This pipeline was
+> developed end-to-end with Anthropic's scientific-computing agent — from writing
+> and iterating the scoring modules, to querying a 9.6 GB conservation file
+> remotely, to fact-checking the top candidates against the scored tables, to
+> re-running the whole thing byte-for-byte and generating every figure. See
+> [How this was built](#how-this-was-built-with-claude-science) for the details.
+> The glass box extends to how the box itself was made.
+
 ```
 python run_pipeline.py            # reproduces the shipped shortlist exactly
 ```
@@ -104,8 +112,7 @@ the developmental moment where human-specific regulation and neuropsychiatric
 risk are thought to coincide. Of the 363 candidates, 347 target genes could be
 timed and 129 peak inside the mid-fetal window.
 
-<img width="1801" height="1231" alt="fig_shortlist_preview" src="https://github.com/user-attachments/assets/7d067041-1a16-461d-83b4-b2da88aa26ce" />
-
+![HAR-annotator shortlist — top 15 of 363, each rank broken into its seven weighted axis contributions. The bar length is the total score; the colored segments show exactly what earns each element its rank.]({{artifact:art_a28ed986-1b83-45bd-beed-b14385034f5b}})
 
 *Because the score is a transparent weighted sum, every rank decomposes into its
 seven axes — you can see precisely what earns each element its place (ZSWIM6's
@@ -639,6 +646,41 @@ brain evolution can raise disease liability under a different genetic
 background, a hypothesis-generating pattern, not a mechanistic claim.
 
 ---
+
+## How this was built with Claude Science
+
+This project was developed end-to-end with **[Claude Science](https://www.anthropic.com)**,
+Anthropic's agent for scientific computing. The same glass-box principle that
+governs the pipeline governs how it was built: every step is inspectable, and
+the agent showed its work. Concretely, Claude Science:
+
+- **Wrote and iterated the pipeline modules** — the funnel filters, the seven
+  evidence axes, and the transparent additive score in `score.py`, each kept
+  small and legible so the reasoning stays visible.
+- **Handled the 9.6 GB problem without downloading 9.6 GB.** The 241-way phyloP
+  conservation track is far too large to pull down. Instead of fetching it,
+  the agent queried the bigWig *remotely* — reading only the ~200 bases under
+  each of the ~3,000 HARs via `pyBigWig` interval stats. The file never lands
+  on disk (`filters.annotate_phylop`).
+- **Fact-checked the candidates against the real tables.** Rather than trusting
+  the narrative, the agent loaded the scored parquet and verified the top hits
+  axis by axis — which is how the #1 element near *ZSWIM6* was correctly
+  attributed to conservation + brain activity (not gene link), and *RPS23* was
+  confirmed as its mirror image (strong gene link, weak constraint).
+- **Computed the funnel comparison and enrichment.** The three-funnel
+  reshuffle (anchored 363 ⊂ discovery 577 ⊂ relaxed 2,757) and the
+  constrained-vs-unconstrained GWAS enrichment (1.37×, Fisher p = 3.6e-3) were
+  both computed directly from the candidate tables.
+- **Re-ran the whole pipeline byte-for-byte.** A clean re-run reproduced the
+  identical funnel (3,257 → 2,757 → 1,718 → 363), identical rank order, and a
+  maximum `total_score` difference of 0.0 — confirming the reproducibility the
+  `manifest.csv` spine is designed for.
+- **Generated the figures** in this repository and the accompanying deck.
+
+*Provenance note:* the pipeline is a collaboration — scientific direction,
+dataset choices, and the biological framing are the author's; Claude Science
+did the implementation, verification, and figure work described above. Every
+result is reproducible from source via `python run_pipeline.py`.
 
 ## License
 
